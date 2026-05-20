@@ -9,6 +9,7 @@ Run with: python validate_deployment.py
 import os
 import sys
 import json
+import subprocess
 from pathlib import Path
 from datetime import datetime
 
@@ -46,6 +47,35 @@ def check_module(module_name):
         return False
 
 
+def run_git_command(args):
+    try:
+        output = subprocess.check_output(['git'] + args, cwd=workspace_root, text=True).strip()
+        return output
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def check_git_remote():
+    url = run_git_command(['config', '--get', 'remote.origin.url'])
+    if url:
+        print(f"  {GREEN}✓{RESET} Git remote origin: {url}")
+        return True
+    print(f"  {YELLOW}⊘{RESET} Git remote origin not configured")
+    return False
+
+
+def check_git_branch():
+    branch = run_git_command(['branch', '--show-current'])
+    if branch:
+        status = f"{GREEN}✓{RESET} Current branch: {branch}"
+        if branch != 'main':
+            status += f" {YELLOW}(recommended branch is main){RESET}"
+        print(f"  {status}")
+        return branch == 'main'
+    print(f"  {YELLOW}⊘{RESET} Unable to detect current git branch")
+    return False
+
+
 print("\n" + "="*70)
 print("StockSageAI Deployment Validation")
 print("="*70)
@@ -56,7 +86,7 @@ stocksage_dir = os.path.join(workspace_root, 'StockSageAI')
 # 1. File Structure
 print(f"\n{BLUE}[1] Core Files{RESET}")
 core_files = [
-    ('app.py', 'Main Streamlit application'),
+    ('StockSageAI/app.py', 'Main Streamlit application'),
     ('requirements.txt', 'Python dependencies'),
     ('package.json', 'Node.js configuration'),
     ('Dockerfile', 'Docker container definition'),
@@ -145,7 +175,12 @@ for f, desc in config_files:
     status = f"{GREEN}✓{RESET}" if exists else f"{YELLOW}⊘{RESET}"
     print(f"  {status} {desc}: {path} {'(optional)' if not exists else ''}")
 
-# 8. Summary & Recommendations
+# 8. Git Setup
+print(f"\n{BLUE}[8] Git Setup{RESET}")
+git_branch_ok = check_git_branch()
+git_remote_ok = check_git_remote()
+
+# 9. Summary & Recommendations
 print("\n" + "="*70)
 print("Deployment Readiness Assessment")
 print("="*70)
@@ -157,6 +192,7 @@ checks = {
     'Demo & Tests': demo_ok,
     'Documentation': docs_ok,
     'Dependencies': packages_ok,
+    'Git Setup': git_branch_ok and git_remote_ok,
 }
 
 print()

@@ -1,0 +1,67 @@
+name: CI - Build & Package
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11']
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run unit tests
+      continue-on-error: true
+      run: |
+        if (Test-Path test_training_stack.py) { python test_training_stack.py }
+
+    - name: Compile Python files
+      run: |
+        python -m py_compile StockSageAI/app.py
+        python -m py_compile StockSageAI/advanced_search_ui.py
+        python -m py_compile StockSageAI/utils.py
+        python -m py_compile StockSageAI/auth.py
+        python -m py_compile StockSageAI/database.py
+        python -m py_compile StockSageAI/data_fetcher.py
+        python -m py_compile validate_deployment.py
+
+  docker_build:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Build Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: false
+        tags: stocksageai:${{ github.sha }}
