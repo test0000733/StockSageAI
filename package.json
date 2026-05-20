@@ -1,0 +1,22 @@
+{
+  "name": "StockSageAI",
+  "version": "1.0.0",
+  "description": "AI-powered stock forecasting and advisory platform",
+  "engines": {
+    "node": "18.x"
+  },
+  "scripts": {
+    "dev": "docker-compose up",
+    "build": "docker build -t stocksageai:latest .",
+    "start": "streamlit run StockSageAI/app.py"
+  },
+  "keywords": [
+    "stock",
+    "forecast",
+    "AI",
+    "trading",
+    "fintech"
+  ],
+  "author": "StockSageAI",
+  "license": "MIT"
+}
