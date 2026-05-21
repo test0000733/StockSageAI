@@ -1,11 +1,15 @@
 import os
 import sys
 
-# Ensure the StockSageAI package is on the import path
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(ROOT_DIR, "StockSageAI"))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 
-from StockSageAI.app import main
+try:
+    from StockSageAI.app import main
+except ImportError:
+    from app import main
+
 
 if __name__ == "__main__":
     main()
