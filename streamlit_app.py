@@ -7,8 +7,11 @@ if ROOT_DIR not in sys.path:
 
 try:
     from StockSageAI.app import main
-except ImportError:
-    from app import main
+except Exception as e:
+    raise ImportError(
+        f"Unable to import StockSageAI.app from {ROOT_DIR}. "
+        f"Please ensure the StockSageAI package is present and its dependencies are installed. Original error: {e}"
+    ) from e
 
 
 if __name__ == "__main__":
