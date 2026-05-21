@@ -85,3 +85,9 @@ Thumbs.db
 .cache/
 *.bak
 *.tmp
+
+# Ignore generated package-local state and temp files in StockSageAI
+StockSageAI/.local/
+StockSageAI/.replit
+StockSageAI/.streamlit/
+StockSageAI/tmp/
