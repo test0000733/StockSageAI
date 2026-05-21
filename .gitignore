@@ -91,3 +91,8 @@ StockSageAI/.local/
 StockSageAI/.replit
 StockSageAI/.streamlit/
 StockSageAI/tmp/
+
+# Allow equity CSVs to be tracked (these are required by the app)
+!EQUITY_L.csv
+!EQUITY_L(in).csv
+!EQUITY_L*.csv

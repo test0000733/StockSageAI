@@ -596,7 +596,7 @@ class AdvancedStockSearch:
             """
 
             st.markdown(result_html, unsafe_allow_html=True)
-            if st.button(f"Analyze {symbol}", key=f"analyze_btn_{i}", use_container_width=True):
+            if st.button(f"Analyze {symbol}", key=f"analyze_btn_{i}", width='stretch'):
                 st.session_state.current_stock = symbol
                 if hasattr(self, 'on_stock_select') and self.on_stock_select:
                     self.on_stock_select(stock)
@@ -634,7 +634,7 @@ class AdvancedStockSearch:
 
                 with cols[idx % 3]:
                     st.markdown(card_content, unsafe_allow_html=True)
-                    if st.button(f"Select {symbol}", key=f"popular_stock_{idx}", use_container_width=True):
+                    if st.button(f"Select {symbol}", key=f"popular_stock_{idx}", width='stretch'):
                         st.session_state.current_stock = symbol
                         if hasattr(self, 'on_stock_select') and self.on_stock_select:
                             self.on_stock_select(stock)
@@ -647,7 +647,7 @@ class AdvancedStockSearch:
             st.markdown('<div class="recent-title">Recent Searches:</div>', unsafe_allow_html=True)
 
             for search_term in self.recent_searches[-5:]:  # Show last 5
-                if st.button(search_term, key=f"recent_search_{search_term}", use_container_width=False):
+                if st.button(search_term, key=f"recent_search_{search_term}", width='content'):
                     st.session_state.stock_search_input = search_term
                     self._on_search_change()
 

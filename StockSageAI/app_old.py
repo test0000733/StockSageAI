@@ -68,9 +68,9 @@ def show_login_page():
 
         col1, col2 = st.columns(2)
         with col1:
-            login_submitted = st.form_submit_button("Login", use_container_width=True)
+            login_submitted = st.form_submit_button("Login", width='stretch')
         with col2:
-            signup_page = st.form_submit_button("Sign Up", use_container_width=True)
+            signup_page = st.form_submit_button("Sign Up", width='stretch')
 
     if login_submitted:
         if not identifier or not password:
@@ -131,9 +131,9 @@ def show_signup_page():
 
         col1, col2 = st.columns(2)
         with col1:
-            signup_submitted = st.form_submit_button("Sign Up", use_container_width=True)
+            signup_submitted = st.form_submit_button("Sign Up", width='stretch')
         with col2:
-            login_page = st.form_submit_button("Back to Login", use_container_width=True)
+            login_page = st.form_submit_button("Back to Login", width='stretch')
 
     if signup_submitted:
         success, message = auth_manager.signup(username, email, password, confirm_password)
@@ -182,9 +182,9 @@ def show_2fa_page():
 
         col1, col2 = st.columns(2)
         with col1:
-            verify_submitted = st.form_submit_button("Verify", use_container_width=True)
+            verify_submitted = st.form_submit_button("Verify", width='stretch')
         with col2:
-            cancel = st.form_submit_button("Cancel", use_container_width=True)
+            cancel = st.form_submit_button("Cancel", width='stretch')
 
     if verify_submitted:
         if not code:
@@ -240,9 +240,9 @@ def show_forgot_password_page():
 
         col1, col2 = st.columns(2)
         with col1:
-            reset_submitted = st.form_submit_button("Send Reset Email", use_container_width=True)
+            reset_submitted = st.form_submit_button("Send Reset Email", width='stretch')
         with col2:
-            back = st.form_submit_button("Back to Login", use_container_width=True)
+            back = st.form_submit_button("Back to Login", width='stretch')
 
     if reset_submitted:
         if not email:
@@ -297,7 +297,7 @@ def show_reset_password_page():
         new_password = st.text_input("New Password", type="password", key="reset_password")
         confirm_password = st.text_input("Confirm Password", type="password", key="reset_confirm")
 
-        reset_submitted = st.form_submit_button("Reset Password", use_container_width=True)
+        reset_submitted = st.form_submit_button("Reset Password", width='stretch')
 
     if reset_submitted:
         success, message = auth_manager.reset_password(token, new_password, confirm_password)
@@ -864,7 +864,7 @@ if st.session_state.alerts:
         }
         for i, a in enumerate(st.session_state.alerts)
     ])
-    st.dataframe(df_alerts[["Stock", "Target Price", "Type", "Status", "Email"]], use_container_width=True)
+    st.dataframe(df_alerts[["Stock", "Target Price", "Type", "Status", "Email"]], width='stretch')
     for i, a in enumerate(st.session_state.alerts):
         if st.button(f"Delete Alert {i+1}", key=f"delete_alert_{i}"):
             st.session_state.alerts[i]["active"] = False
@@ -1339,7 +1339,7 @@ elif page == "Stock Analysis":
             )
             
             st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-            st.plotly_chart(fig_price, use_container_width=True)
+            st.plotly_chart(fig_price, width='stretch')
             st.markdown('</div>', unsafe_allow_html=True)
         
         with col1:
@@ -1555,7 +1555,7 @@ elif page == "Stock Analysis":
                 )
                 
                 fig_sentiment.update_layout(height=300)
-                st.plotly_chart(fig_sentiment, use_container_width=True)
+                st.plotly_chart(fig_sentiment, width='stretch')
                 
                 # Average sentiment
                 avg_sentiment = np.mean([s['compound'] for s in sentiment_scores])
@@ -1686,7 +1686,7 @@ elif page == "Market Overview":
                 budget_df[col] = budget_df[col].apply(lambda x: f"₹{x:,.2f}" if pd.notnull(x) else "N/A")
             budget_df['Change %'] = budget_df['Change %'].apply(lambda x: f"{x:+.2f}%" if pd.notnull(x) else "N/A")
             budget_df['Volume'] = budget_df['Volume'].apply(lambda x: f"{int(x):,}" if pd.notnull(x) else "N/A")
-            st.dataframe(budget_df[['Symbol', 'Price', 'Change %', 'Day High', 'Day Low', 'Volume']], use_container_width=True)
+            st.dataframe(budget_df[['Symbol', 'Price', 'Change %', 'Day High', 'Day Low', 'Volume']], width='stretch')
         else:
             st.info("No stocks found in this price range.")
     else:
@@ -1708,7 +1708,7 @@ elif page == "Market Overview":
                 gainers_df[col] = gainers_df[col].apply(lambda x: f"₹{x:,.2f}" if pd.notnull(x) else "N/A")
             gainers_df['Change %'] = gainers_df['Change %'].apply(lambda x: f"+{x:.2f}%" if pd.notnull(x) else "N/A")
             gainers_df['Volume'] = gainers_df['Volume'].apply(lambda x: f"{int(x):,}" if pd.notnull(x) else "N/A")
-            st.dataframe(gainers_df[['Symbol', 'Price', 'Change %', 'Day High', 'Day Low', 'Volume']], use_container_width=True)
+            st.dataframe(gainers_df[['Symbol', 'Price', 'Change %', 'Day High', 'Day Low', 'Volume']], width='stretch')
         else:
             st.info("Unable to fetch gainers data")
         st.markdown('</div>', unsafe_allow_html=True)
@@ -1722,7 +1722,7 @@ elif page == "Market Overview":
                 losers_df[col] = losers_df[col].apply(lambda x: f"₹{x:,.2f}" if pd.notnull(x) else "N/A")
             losers_df['Change %'] = losers_df['Change %'].apply(lambda x: f"{x:.2f}%" if pd.notnull(x) else "N/A")
             losers_df['Volume'] = losers_df['Volume'].apply(lambda x: f"{int(x):,}" if pd.notnull(x) else "N/A")
-            st.dataframe(losers_df[['Symbol', 'Price', 'Change %', 'Day High', 'Day Low', 'Volume']], use_container_width=True)
+            st.dataframe(losers_df[['Symbol', 'Price', 'Change %', 'Day High', 'Day Low', 'Volume']], width='stretch')
         else:
             st.info("Unable to fetch losers data")
         st.markdown('</div>', unsafe_allow_html=True)
@@ -2032,7 +2032,7 @@ if st.session_state.get('analysis_complete', False):
         title_font_size=16,
         title_font_color='#2E86C1'
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     # Show recommendations for each period
     st.markdown("### 📝 Recommendations for Each Forecast Period")
@@ -2312,34 +2312,34 @@ def add_sidebar_navigation():
     with st.sidebar:
         st.title("Navigation")
 
-        if st.button("📊 Dashboard", use_container_width=True):
+        if st.button("📊 Dashboard", width='stretch'):
             st.session_state.page = 'dashboard'
             st.rerun()
 
-        if st.button("📈 Analysis", use_container_width=True):
+        if st.button("📈 Analysis", width='stretch'):
             st.session_state.page = 'analysis'
             st.rerun()
 
-        if st.button("🚨 Alerts", use_container_width=True):
+        if st.button("🚨 Alerts", width='stretch'):
             st.session_state.page = 'alerts'
             st.rerun()
 
-        if st.button("💼 Portfolio", use_container_width=True):
+        if st.button("💼 Portfolio", width='stretch'):
             st.session_state.page = 'portfolio'
             st.rerun()
 
-        if st.button("⚙️ Settings", use_container_width=True):
+        if st.button("⚙️ Settings", width='stretch'):
             st.session_state.page = 'settings'
             st.rerun()
 
         if auth_manager.has_any_role(['Super Admin', 'Admin']):
             st.divider()
-            if st.button("🛡️ Admin Dashboard", use_container_width=True):
+            if st.button("🛡️ Admin Dashboard", width='stretch'):
                 st.session_state.page = 'admin'
                 st.rerun()
 
         st.divider()
-        if st.button("🚪 Logout", use_container_width=True):
+        if st.button("🚪 Logout", width='stretch'):
             auth_manager.logout()
 
 # Update the main app to include navigation

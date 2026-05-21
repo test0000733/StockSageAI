@@ -573,7 +573,7 @@ if st.session_state.analysis_complete:
         title_font_color='#2E86C1'
     )
     st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-    st.plotly_chart(fig_price, use_container_width=True)
+    st.plotly_chart(fig_price, width='stretch')
     st.markdown('</div>', unsafe_allow_html=True)
     
     with st.container():
@@ -595,7 +595,7 @@ if st.session_state.analysis_complete:
             )
             
             fig_sentiment.update_layout(height=300)
-            st.plotly_chart(fig_sentiment, use_container_width=True)
+            st.plotly_chart(fig_sentiment, width='stretch')
             
             # Average sentiment
             avg_sentiment = np.mean([s['compound'] for s in sentiment_scores])
