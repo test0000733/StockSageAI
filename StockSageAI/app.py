@@ -2341,19 +2341,120 @@ def show_admin_ai_forecasting():
         if st.session_state.admin_ai_model not in available_models:
             st.session_state.admin_ai_model = available_models[0]
 
-        selected_model = st.selectbox(
-            "Primary model",
-            available_models,
-            index=available_models.index(st.session_state.admin_ai_model),
-            key='admin_ai_model'
+        selected_models = st.multiselect(
+            "Select AI models to run",
+            options=available_models,
+            default=[st.session_state.admin_ai_model],
+            key='admin_ai_selected_models'
         )
 
-        if st.button("Analyze Now", key='admin_ai_run') or st.session_state.admin_ai_auto_run:
-            st.session_state.admin_ai_results = ai_forecast_engine.analyze_stock(
+        confidence_threshold = st.slider(
+            "Minimum confidence threshold",
+            min_value=0,
+            max_value=100,
+            value=40,
+            step=5,
+            key='admin_ai_confidence_threshold'
+        )
+
+        cols = st.columns([2, 2, 2])
+        with cols[0]:
+            if st.button("Analyze Now", key='admin_ai_run'):
+                st.session_state.admin_ai_results = get_cached_admin_ai_results(
+                    st.session_state.admin_ai_stock,
+                    tuple(selected_models),
+                    st.session_state.get('admin_ai_refresh_counter', 0)
+                )
+                st.session_state.admin_ai_auto_run = False
+        with cols[1]:
+            if st.button("Run Ensemble", key='admin_ai_run_ensemble'):
+                if selected_models:
+                    st.session_state.admin_ai_results = get_cached_admin_ai_results(
+                        st.session_state.admin_ai_stock,
+                        tuple(selected_models),
+                        st.session_state.get('admin_ai_refresh_counter', 0) + 1
+                    )
+                    st.session_state.admin_ai_refresh_counter = st.session_state.get('admin_ai_refresh_counter', 0) + 1
+                    st.session_state.admin_ai_auto_run = False
+        with cols[2]:
+            if st.button("Reset cache", key='admin_ai_reset_cache'):
+                st.session_state.admin_ai_refresh_counter = st.session_state.get('admin_ai_refresh_counter', 0) + 1
+                st.session_state.admin_ai_results = None
+                st.experimental_rerun()
+
+        if st.session_state.admin_ai_auto_run and selected_models:
+            st.session_state.admin_ai_results = get_cached_admin_ai_results(
                 st.session_state.admin_ai_stock,
-                selected_model
+                tuple(selected_models),
+                st.session_state.get('admin_ai_refresh_counter', 0)
             )
             st.session_state.admin_ai_auto_run = False
+
+        if 'admin_ai_selected_models' not in st.session_state or not st.session_state.admin_ai_selected_models:
+            st.session_state.admin_ai_selected_models = [st.session_state.admin_ai_model]
+
+        if st.session_state.admin_ai_results:
+            results = st.session_state.admin_ai_results
+            if 'error' in results:
+                st.error(results['error'])
+            else:
+                cols = st.columns(4)
+                cols[0].metric("Current", f"₹{results.get('current_price', 0)}")
+                cols[1].metric("Ensemble", f"₹{results.get('ensemble', 0):.2f}")
+                cols[2].metric("AI Confidence", f"{results.get('confidence', 0):.1f}%")
+                cols[3].metric("Models run", len(results.get('results', [])))
+
+                st.markdown(f"**Regime outlook:** {results.get('regime', 'Mixed')}")
+                st.markdown(f"**Regime confidence:** {results.get('regime_confidence', 0.0)}%")
+                st.markdown(f"**Anomaly score:** {results.get('anomaly_score', 0.0)}%")
+
+                weights = results.get('recommended_weights', {})
+                if weights:
+                    with st.expander("Recommended model weight allocation"):
+                        for model_name, weight in weights.items():
+                            st.write(f"- {model_name}: {int(weight * 100)}%")
+
+                state_probs = results.get('state_probabilities', {})
+                if state_probs:
+                    with st.expander("Regime probability distribution"):
+                        for regime_name, prob in state_probs.items():
+                            st.write(f"- {regime_name}: {prob}%")
+
+                history = results.get('regime_history', [])
+                if history:
+                    with st.expander("Recent regime history"):
+                        for item in history[-10:]:
+                            st.write(f"{item.get('date', '')} — {item.get('regime', '')} ({item.get('confidence', 0)}%)")
+
+                model_summary = next(
+                    (item for item in results.get('results', []) if item['model'] == st.session_state.admin_ai_model),
+                    results.get('results', [None])[0]
+                )
+                if model_summary:
+                    st.markdown("#### Selected model impact")
+                    sm_cols = st.columns([2, 2, 2])
+                    sm_cols[0].metric("Model", model_summary.get('model', 'Unknown'))
+                    sm_cols[1].metric("Prediction", f"₹{model_summary.get('prediction', 0)}")
+                    sm_cols[2].metric("Confidence", f"{model_summary.get('confidence', 0)}%")
+                    st.markdown(f"**Model regime:** {model_summary.get('regime', 'Unknown')}")
+                    st.markdown(f"**Model reasoning:** {model_summary.get('reasoning', '')}")
+                    st.markdown("---")
+
+                st.markdown("---")
+                for model_result in results.get('results', []):
+                    with st.expander(f"{model_result.get('model', 'Model')} — ₹{model_result.get('prediction', 0)} ({model_result.get('confidence', 0)}%)"):
+                        st.markdown(f"**Regime:** {model_result.get('regime', 'Unknown')}")
+                        st.markdown(f"**Summary:** {model_result.get('summary', '')}")
+                        st.markdown(f"**Reasoning:** {model_result.get('reasoning', '')}")
+
+                st.markdown("---")
+                st.markdown("#### Forecast architecture notes")
+                st.write("This admin-only engine is built as a modular hybrid forecast system with placeholder Transformer, GNN, and sequence model components. It is designed to evolve into a full next-gen AI forecasting architecture.")
+        elif st.session_state.admin_ai_stock:
+            st.info("Click 'Analyze Now' or 'Run Ensemble' to execute the selected admin AI models.")
+        else:
+            st.info("Search a stock name above to auto-select it and start the admin AI analysis.")
+        return
 
     if st.session_state.admin_ai_results:
         results = st.session_state.admin_ai_results
@@ -2493,13 +2594,79 @@ def show_user_management():
     else:
         st.info("No users found. New users will appear here after signup.")
 
+@st.cache_data(ttl=60)
+def get_cached_system_metrics(refresh_counter=0):
+    db = Database()
+    return {
+        'system_health': db.get_system_health(),
+        'api_usage': db.get_api_usage_stats(),
+        'system_perf': db.get_system_performance()
+    }
+
+
+@st.cache_data(ttl=120)
+def get_cached_admin_ai_results(symbol, model_tuple, refresh_counter=0):
+    if not symbol or not model_tuple:
+        return None
+
+    model_results = []
+    for model_name in model_tuple:
+        result = ai_forecast_engine.analyze_stock(symbol, model_name)
+        if isinstance(result, dict):
+            model_results.append(result)
+
+    if not model_results:
+        return {'error': 'No forecast results were generated.'}
+
+    if len(model_results) == 1:
+        return model_results[0]
+
+    # Build a combined ensemble summary
+    predictions = [res.get('current_price', 0) for res in model_results if res.get('current_price') is not None]
+    confidences = [res.get('confidence', 0) for res in model_results if res.get('confidence') is not None]
+    ensemble_value = sum(predictions) / len(predictions) if predictions else 0
+    average_confidence = sum(confidences) / len(confidences) if confidences else 0
+
+    combined = {
+        'current_price': model_results[0].get('current_price', 0),
+        'ensemble': ensemble_value,
+        'confidence': average_confidence,
+        'regime': model_results[0].get('regime', 'Mixed'),
+        'regime_confidence': average_confidence,
+        'anomaly_score': sum(res.get('anomaly_score', 0) for res in model_results) / len(model_results),
+        'recommended_weights': {m: 1 / len(model_results) for m in model_tuple},
+        'state_probabilities': model_results[0].get('state_probabilities', {}),
+        'regime_history': model_results[0].get('regime_history', []),
+        'results': []
+    }
+    for res in model_results:
+        summary = {
+            'model': res.get('model', 'Unknown'),
+            'prediction': res.get('prediction', res.get('current_price', 0)),
+            'confidence': res.get('confidence', 0),
+            'regime': res.get('regime', 'Unknown'),
+            'reasoning': res.get('reasoning', ''),
+            'summary': res.get('summary', '')
+        }
+        combined['results'].append(summary)
+
+    return combined
+
+
 def show_analytics():
     st.subheader("System Analytics")
 
-    db = Database()
-    system_health = db.get_system_health()
-    api_usage = db.get_api_usage_stats()
-    system_perf = db.get_system_performance()
+    if 'analytics_refresh_counter' not in st.session_state:
+        st.session_state.analytics_refresh_counter = 0
+
+    if st.button("Refresh metrics", key='analytics_refresh'):
+        st.session_state.analytics_refresh_counter += 1
+        st.experimental_rerun()
+
+    metrics = get_cached_system_metrics(st.session_state.analytics_refresh_counter)
+    system_health = metrics.get('system_health', {})
+    api_usage = metrics.get('api_usage', [])
+    system_perf = metrics.get('system_perf', [])
 
     if system_health:
         cols = st.columns(4)
@@ -2507,11 +2674,16 @@ def show_analytics():
         cols[1].metric("Active Alerts", system_health.get('active_alerts', 0))
         cols[2].metric("Activities (24h)", system_health.get('activities_24h', 0))
         cols[3].metric("API Calls (1h)", system_health.get('api_calls_1h', 0))
+        st.caption(f"Last refreshed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    else:
+        st.warning("No system health metrics are available.")
 
     if api_usage:
         st.markdown("### API Usage")
         df_api = pd.DataFrame(api_usage)
         st.dataframe(df_api, width='stretch')
+        if not df_api.empty and 'request_count' in df_api.columns:
+            st.line_chart(df_api.set_index('last_used')['request_count'])
     else:
         st.info("No API usage data is available yet.")
 
@@ -2522,8 +2694,19 @@ def show_analytics():
             st.dataframe(df_perf[['recorded_at', 'metric_name', 'metric_value', 'metric_data']].head(20), width='stretch')
         else:
             st.dataframe(df_perf.head(20), width='stretch')
+
+        if not df_perf.empty and 'metric_value' in df_perf.columns:
+            perf_chart = df_perf.copy()
+            perf_chart['recorded_at'] = pd.to_datetime(perf_chart['recorded_at'], errors='coerce')
+            perf_chart = perf_chart.dropna(subset=['recorded_at'])
+            if not perf_chart.empty:
+                perf_chart = perf_chart.sort_values('recorded_at')
+                st.line_chart(perf_chart.set_index('recorded_at')['metric_value'])
     else:
         st.info("No system performance metrics recorded yet.")
+
+    st.markdown("---")
+    st.write("Use the refresh button to reload analytics after background system updates.")
 
     # Add charts for user growth, API usage over time, etc.
 
@@ -2568,6 +2751,58 @@ def show_security_settings():
     st.subheader("Security Settings")
     st.write("Authentication policy and lockout thresholds.")
     st.write("Account locking after 5 failed login attempts with 15-minute cooldown.")
+
+    # Admin controls for 2FA management
+    db = Database()
+    if auth_manager.has_any_role(['Super Admin', 'Admin']):
+        st.markdown("---")
+        st.markdown("### 🔐 Admin: Two-Factor (PIN) Management")
+        users = db.get_all_users()
+        if users:
+            # Display a compact table of users and 2FA status
+            display_df = pd.DataFrame(users)[['id', 'username', 'email', 'role', 'two_factor_enabled', 'last_login']]
+            display_df = display_df.rename(columns={
+                'id': 'User ID', 'username': 'Username', 'email': 'Email', 'role': 'Role',
+                'two_factor_enabled': '2FA Enabled', 'last_login': 'Last Login'
+            })
+            st.dataframe(display_df, width='stretch')
+
+            st.write("Select a user below to manage their 2FA settings:")
+            for user in users:
+                cols = st.columns([3, 1, 1, 1])
+                with cols[0]:
+                    st.markdown(f"**{user['username']}** — {user['email']} — {user['role']}")
+                with cols[1]:
+                    status = 'Enabled' if user.get('two_factor_enabled') else 'Disabled'
+                    st.markdown(status)
+                with cols[2]:
+                    if st.button(f"Disable 2FA", key=f"disable_2fa_{user['id']}"):
+                        success, msg = auth_manager.disable_security_pin(user['id']) if hasattr(auth_manager, 'disable_security_pin') else (False, 'Operation not available')
+                        if success:
+                            db.log_activity(auth_manager.get_current_user()['id'], 'admin_disable_2fa', f"Disabled 2FA for {user['email']}")
+                            st.success(f"Disabled 2FA for {user['username']}")
+                            st.experimental_rerun()
+                        else:
+                            st.error(f"Failed: {msg}")
+                with cols[3]:
+                    if st.button(f"Create PIN reset", key=f"resetpin_{user['id']}"):
+                        # Create a PIN reset token and show the reset link (admins can share it)
+                        token = db.create_pin_reset_token(user['email'])
+                        reset_link = f"?page=pin_reset&token={token}"
+                        db.log_activity(auth_manager.get_current_user()['id'], 'admin_pin_reset_created', f"Created PIN reset token for {user['email']}")
+                        st.info(f"PIN reset link (share with user): {reset_link}")
+                    if st.button(f"Temp bypass PIN", key=f"bypass_2fa_{user['id']}"):
+                        success, msg = auth_manager.disable_security_pin(user['id']) if hasattr(auth_manager, 'disable_security_pin') else (False, 'Operation not available')
+                        if success:
+                            db.log_activity(auth_manager.get_current_user()['id'], 'admin_bypass_2fa', f"Temporarily bypassed 2FA for {user['email']}")
+                            st.success(f"Temporarily bypassed 2FA for {user['username']}")
+                            st.experimental_rerun()
+                        else:
+                            st.error(f"Failed: {msg}")
+        else:
+            st.info("No users found in the system.")
+    else:
+        st.info("Admin 2FA management is available for Admin/Super Admin roles only.")
 
 
 def add_sidebar_navigation():
