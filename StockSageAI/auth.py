@@ -26,7 +26,7 @@ class AuthManager:
 
     def login_required(self, func):
         def wrapper(*args, **kwargs):
-            if not st.session_state.authenticated or not st.session_state.user:
+            if not st.session_state.get('authenticated', False) or not st.session_state.get('user'):
                 st.session_state.page = 'login'
                 st.rerun()
             return func(*args, **kwargs)
@@ -34,7 +34,7 @@ class AuthManager:
 
     def admin_required(self, func):
         def wrapper(*args, **kwargs):
-            if not st.session_state.authenticated or not st.session_state.user:
+            if not st.session_state.get('authenticated', False) or not st.session_state.get('user'):
                 st.session_state.page = 'login'
                 st.rerun()
             if st.session_state.user['role'] not in ['Super Admin', 'Admin']:
@@ -45,7 +45,7 @@ class AuthManager:
 
     def super_admin_required(self, func):
         def wrapper(*args, **kwargs):
-            if not st.session_state.authenticated or not st.session_state.user:
+            if not st.session_state.get('authenticated', False) or not st.session_state.get('user'):
                 st.session_state.page = 'login'
                 st.rerun()
             if st.session_state.user['role'] != 'Super Admin':
@@ -205,7 +205,7 @@ class AuthManager:
             if token:
                 if isinstance(token, list):
                     token = token[0]
-                if token and not st.session_state.authenticated:
+                if token and not st.session_state.get('authenticated', False):
                     user = self.db.get_user_by_token(token)
                     if user and (user['role'] in ['Admin', 'Super Admin'] or user['is_active']):
                         st.session_state.user = user
@@ -286,20 +286,22 @@ class AuthManager:
         return True, "Password reset successfully."
 
     def get_current_user(self):
-        return st.session_state.user
+        return st.session_state.get('user')
 
     def is_authenticated(self):
-        return st.session_state.authenticated
+        return st.session_state.get('authenticated', False)
 
     def has_role(self, role):
         if not self.is_authenticated():
             return False
-        return st.session_state.user['role'] == role
+        user = st.session_state.get('user')
+        return bool(user and user.get('role') == role)
 
     def has_any_role(self, roles):
         if not self.is_authenticated():
             return False
-        return st.session_state.user['role'] in roles
+        user = st.session_state.get('user')
+        return bool(user and user.get('role') in roles)
 
 # Global auth manager instance
 auth_manager = AuthManager()

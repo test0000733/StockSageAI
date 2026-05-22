@@ -550,7 +550,8 @@ def show_login_page():
         with col1:
             login_submitted = st.form_submit_button("Login", width='stretch')
         with col2:
-            signup_page = st.form_submit_button("Sign Up", width='stretch')
+            # Signup option removed — accounts are created by admins only
+            st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True)
 
     if login_submitted:
         if not identifier or not password:
@@ -579,9 +580,7 @@ def show_login_page():
                         st.session_state.page = 'pin_reset_request'
                         st.rerun()
 
-    if signup_page:
-        st.session_state.page = 'signup'
-        st.rerun()
+    # signup_page has been removed — self-service signup disabled
 
     if st.button("Forgot Password?", key="forgot_link"):
         st.session_state.page = 'forgot_password'
