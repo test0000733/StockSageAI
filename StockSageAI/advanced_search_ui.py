@@ -550,16 +550,19 @@ class AdvancedStockSearch:
             on_change=self._on_search_change
         )
 
+        search_query = st.session_state.get('search_query', '')
+
         # Clear button
-        if st.session_state.search_query:
+        if search_query:
             if st.button("×", key="clear_search", help="Clear search"):
                 self.clear_search()
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-        if st.session_state.search_query and len(st.session_state.search_query.strip()) >= 2:
-            if st.session_state.search_results:
-                self.render_search_stats(st.session_state.search_query, len(st.session_state.search_results))
+        search_query = st.session_state.get('search_query', '')
+        if search_query and len(search_query.strip()) >= 2:
+            if st.session_state.get('search_results'):
+                self.render_search_stats(search_query, len(st.session_state.get('search_results', [])))
                 self.render_dropdown()
             else:
                 st.markdown(
@@ -573,14 +576,15 @@ class AdvancedStockSearch:
         """Render the autocomplete dropdown with interactive buttons"""
         st.markdown('<div class="search-dropdown">', unsafe_allow_html=True)
 
-        for i, stock in enumerate(st.session_state.search_results[:8]):  # Limit to 8 results
+        search_query = st.session_state.get('search_query', '')
+        for i, stock in enumerate(st.session_state.get('search_results', [])[:8]):  # Limit to 8 results
             symbol = stock.get('SYMBOL', '')
             name = stock.get('NAME OF COMPANY', '')
             exchange = stock.get('EXCHANGE', '')
             sector = self.get_sector_mapping(symbol)
 
-            highlighted_symbol = self.highlight_match(symbol, st.session_state.search_query)
-            highlighted_name = self.highlight_match(name, st.session_state.search_query)
+            highlighted_symbol = self.highlight_match(symbol, search_query)
+            highlighted_name = self.highlight_match(name, search_query)
             exchange_badge = self.get_exchange_badge(exchange)
 
             result_html = f"""
@@ -657,9 +661,10 @@ class AdvancedStockSearch:
 
     def _on_search_change(self):
         """Handle search input changes"""
-        query = st.session_state.stock_search_input
+        query = st.session_state.get('stock_search_input', '')
+        current_query = st.session_state.get('search_query', '')
 
-        if query != st.session_state.search_query:
+        if query != current_query:
             st.session_state.search_query = query
 
             if len(query.strip()) >= 2:
