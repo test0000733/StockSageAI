@@ -548,8 +548,8 @@ def show_login_page():
         return
 
     st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-    st.markdown('<div class="auth-title">🔐 Login to StockSageAI</div>', unsafe_allow_html=True)
-    st.markdown('<div class="auth-caption">Securely access your personalized market insights and forecast tools.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="auth-title">🔐 Login to SP 07</div>', unsafe_allow_html=True)
+    st.markdown('<div class="auth-caption">Enterprise-grade AI forecasting and market intelligence platform.</div>', unsafe_allow_html=True)
 
     with st.form("login_form"):
         identifier = st.text_input("Email or Username", key="login_identifier")
