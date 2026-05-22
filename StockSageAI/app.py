@@ -84,11 +84,13 @@ if 'search_query' not in st.session_state:
 if 'admin_ai_stock' not in st.session_state:
     st.session_state.admin_ai_stock = ''
 if 'admin_ai_model' not in st.session_state:
-    st.session_state.admin_ai_model = 'Transformer Ensemble'
+    st.session_state.admin_ai_model = 'Transformer LSTM'
 if 'admin_ai_results' not in st.session_state:
     st.session_state.admin_ai_results = None
 if 'admin_ai_auto_run' not in st.session_state:
     st.session_state.admin_ai_auto_run = False
+if 'admin_ai_all_models' not in st.session_state:
+    st.session_state.admin_ai_all_models = False
 if 'admin_train_job' not in st.session_state:
     st.session_state.admin_train_job = None
 if 'admin_train_status' not in st.session_state:
@@ -2343,20 +2345,22 @@ def show_admin_ai_forecasting():
     admin_ai_stock = st.session_state.get('admin_ai_stock', '')
     if admin_ai_stock:
         st.markdown(f"### Selected symbol: **{admin_ai_stock}**")
-        available_models = [
-            'Transformer Ensemble',
-            'LSTM',
-            'BiLSTM',
-            'CNN-LSTM',
-            'GNN Ensemble'
-        ]
+        
+        # Import trained model manager - 5 visible models only
+        from trained_model_manager import (
+            get_visible_model_names,
+            get_all_model_names,
+            get_model_manager
+        )
+        
+        available_models = get_visible_model_names()  # 5 visible models
         admin_ai_model = st.session_state.get('admin_ai_model', available_models[0])
         if admin_ai_model not in available_models:
             st.session_state.admin_ai_model = available_models[0]
             admin_ai_model = available_models[0]
 
         selected_models = st.multiselect(
-            "Select AI models to run",
+            "Select AI models to run (5 models + 3 background ensemble)",
             options=available_models,
             default=[admin_ai_model],
             key='admin_ai_selected_models'
