@@ -38,6 +38,9 @@ def check_directory(path, description):
 
 def check_module(module_name):
     """Check if a Python module can be imported."""
+    if module_name == 'scikit-learn':
+        module_name = 'sklearn'
+
     try:
         __import__(module_name)
         print(f"  {GREEN}✓{RESET} {module_name}")
@@ -48,11 +51,18 @@ def check_module(module_name):
 
 
 def run_git_command(args):
-    try:
-        output = subprocess.check_output(['git'] + args, cwd=workspace_root, text=True).strip()
-        return output
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return None
+    git_paths = ['git']
+    local_git = os.path.join(workspace_root, 'Git', 'cmd', 'git.exe')
+    if os.path.exists(local_git):
+        git_paths.append(local_git)
+
+    for git_cmd in git_paths:
+        try:
+            output = subprocess.check_output([git_cmd] + args, cwd=workspace_root, text=True).strip()
+            return output
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            continue
+    return None
 
 
 def check_git_remote():
