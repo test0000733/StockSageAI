@@ -54,6 +54,16 @@ from StockSageAI.admin_ai_ui import render_admin_training_dashboard
 # Toggle verbose debug info in the app UI
 DEBUG_UI = True
 
+
+def safe_rerun():
+    """Use the available Streamlit rerun API across versions."""
+    if hasattr(st, 'experimental_rerun'):
+        return st.experimental_rerun()
+    if hasattr(st, 'rerun'):
+        return st.rerun()
+    raise RuntimeError('Streamlit rerun is not available in this Streamlit version.')
+
+
 # Initialize session state
 if 'user' not in st.session_state:
     st.session_state.user = None
@@ -2380,7 +2390,7 @@ def show_admin_ai_forecasting():
             if st.button("Reset cache", key='admin_ai_reset_cache'):
                 st.session_state.admin_ai_refresh_counter = st.session_state.get('admin_ai_refresh_counter', 0) + 1
                 st.session_state.admin_ai_results = None
-                st.experimental_rerun()
+                safe_rerun()
 
         if st.session_state.admin_ai_auto_run and selected_models:
             st.session_state.admin_ai_results = get_cached_admin_ai_results(
@@ -2661,7 +2671,7 @@ def show_analytics():
 
     if st.button("Refresh metrics", key='analytics_refresh'):
         st.session_state.analytics_refresh_counter += 1
-        st.experimental_rerun()
+        safe_rerun()
 
     metrics = get_cached_system_metrics(st.session_state.analytics_refresh_counter)
     system_health = metrics.get('system_health', {})
@@ -2781,7 +2791,7 @@ def show_security_settings():
                         if success:
                             db.log_activity(auth_manager.get_current_user()['id'], 'admin_disable_2fa', f"Disabled 2FA for {user['email']}")
                             st.success(f"Disabled 2FA for {user['username']}")
-                            st.experimental_rerun()
+                            safe_rerun()
                         else:
                             st.error(f"Failed: {msg}")
                 with cols[3]:
@@ -2796,7 +2806,7 @@ def show_security_settings():
                         if success:
                             db.log_activity(auth_manager.get_current_user()['id'], 'admin_bypass_2fa', f"Temporarily bypassed 2FA for {user['email']}")
                             st.success(f"Temporarily bypassed 2FA for {user['username']}")
-                            st.experimental_rerun()
+                            safe_rerun()
                         else:
                             st.error(f"Failed: {msg}")
         else:
