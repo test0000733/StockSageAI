@@ -2330,17 +2330,19 @@ def show_admin_ai_forecasting():
 
         search_ui.render(on_stock_select=on_admin_stock_select)
     else:
-        st.session_state.admin_ai_stock = st.text_input("Stock symbol or name", value=st.session_state.admin_ai_stock, key='admin_ai_manual_stock')
+        stock_input = st.text_input("Stock symbol or name", value=st.session_state.get('admin_ai_stock', ''), key='admin_ai_manual_stock')
+        st.session_state.admin_ai_stock = stock_input
         if st.button("Load Stock", key='admin_ai_load_stock'):
-            st.session_state.admin_ai_stock = st.session_state.admin_ai_manual_stock.strip().upper()
+            st.session_state.admin_ai_stock = st.session_state.get('admin_ai_manual_stock', '').strip().upper()
             st.session_state.admin_ai_auto_run = True
             st.session_state.admin_ai_results = None
             st.rerun()
 
     st.markdown("---")
 
-    if st.session_state.admin_ai_stock:
-        st.markdown(f"### Selected symbol: **{st.session_state.admin_ai_stock}**")
+    admin_ai_stock = st.session_state.get('admin_ai_stock', '')
+    if admin_ai_stock:
+        st.markdown(f"### Selected symbol: **{admin_ai_stock}**")
         available_models = [
             'Transformer Ensemble',
             'LSTM',
@@ -2348,13 +2350,15 @@ def show_admin_ai_forecasting():
             'CNN-LSTM',
             'GNN Ensemble'
         ]
-        if st.session_state.admin_ai_model not in available_models:
+        admin_ai_model = st.session_state.get('admin_ai_model', available_models[0])
+        if admin_ai_model not in available_models:
             st.session_state.admin_ai_model = available_models[0]
+            admin_ai_model = available_models[0]
 
         selected_models = st.multiselect(
             "Select AI models to run",
             options=available_models,
-            default=[st.session_state.admin_ai_model],
+            default=[admin_ai_model],
             key='admin_ai_selected_models'
         )
 
@@ -2371,7 +2375,7 @@ def show_admin_ai_forecasting():
         with cols[0]:
             if st.button("Analyze Now", key='admin_ai_run'):
                 st.session_state.admin_ai_results = get_cached_admin_ai_results(
-                    st.session_state.admin_ai_stock,
+                    admin_ai_stock,
                     tuple(selected_models),
                     st.session_state.get('admin_ai_refresh_counter', 0)
                 )
@@ -2380,7 +2384,7 @@ def show_admin_ai_forecasting():
             if st.button("Run Ensemble", key='admin_ai_run_ensemble'):
                 if selected_models:
                     st.session_state.admin_ai_results = get_cached_admin_ai_results(
-                        st.session_state.admin_ai_stock,
+                        admin_ai_stock,
                         tuple(selected_models),
                         st.session_state.get('admin_ai_refresh_counter', 0) + 1
                     )
@@ -2392,19 +2396,20 @@ def show_admin_ai_forecasting():
                 st.session_state.admin_ai_results = None
                 safe_rerun()
 
-        if st.session_state.admin_ai_auto_run and selected_models:
+        if st.session_state.get('admin_ai_auto_run', False) and selected_models:
             st.session_state.admin_ai_results = get_cached_admin_ai_results(
-                st.session_state.admin_ai_stock,
+                admin_ai_stock,
                 tuple(selected_models),
                 st.session_state.get('admin_ai_refresh_counter', 0)
             )
             st.session_state.admin_ai_auto_run = False
 
-        if 'admin_ai_selected_models' not in st.session_state or not st.session_state.admin_ai_selected_models:
-            st.session_state.admin_ai_selected_models = [st.session_state.admin_ai_model]
+        if 'admin_ai_selected_models' not in st.session_state or not st.session_state.get('admin_ai_selected_models'):
+            st.session_state.admin_ai_selected_models = [admin_ai_model]
 
-        if st.session_state.admin_ai_results:
-            results = st.session_state.admin_ai_results
+        admin_ai_results = st.session_state.get('admin_ai_results')
+        if admin_ai_results:
+            results = admin_ai_results
             if 'error' in results:
                 st.error(results['error'])
             else:
@@ -2437,7 +2442,7 @@ def show_admin_ai_forecasting():
                             st.write(f"{item.get('date', '')} — {item.get('regime', '')} ({item.get('confidence', 0)}%)")
 
                 model_summary = next(
-                    (item for item in results.get('results', []) if item['model'] == st.session_state.admin_ai_model),
+                    (item for item in results.get('results', []) if item['model'] == admin_ai_model),
                     results.get('results', [None])[0]
                 )
                 if model_summary:
@@ -2460,69 +2465,10 @@ def show_admin_ai_forecasting():
                 st.markdown("---")
                 st.markdown("#### Forecast architecture notes")
                 st.write("This admin-only engine is built as a modular hybrid forecast system with placeholder Transformer, GNN, and sequence model components. It is designed to evolve into a full next-gen AI forecasting architecture.")
-        elif st.session_state.admin_ai_stock:
+        elif admin_ai_stock:
             st.info("Click 'Analyze Now' or 'Run Ensemble' to execute the selected admin AI models.")
         else:
             st.info("Search a stock name above to auto-select it and start the admin AI analysis.")
-        return
-
-    if st.session_state.admin_ai_results:
-        results = st.session_state.admin_ai_results
-        if 'error' in results:
-            st.error(results['error'])
-        else:
-            cols = st.columns(3)
-            cols[0].metric("Current", f"₹{results['current_price']}")
-            cols[1].metric("Ensemble", f"₹{results['ensemble']}")
-            cols[2].metric("AI Confidence", f"{results['confidence']}%")
-
-            st.markdown(f"**Regime outlook:** {results['regime']}  ")
-            st.markdown(f"**Regime confidence:** {results.get('regime_confidence', 0.0)}%  ")
-            st.markdown(f"**Anomaly score:** {results.get('anomaly_score', 0.0)}%  ")
-
-            weights = results.get('recommended_weights', {})
-            if weights:
-                with st.expander("Recommended model weight allocation"):
-                    for model_name, weight in weights.items():
-                        st.write(f"- {model_name}: {int(weight * 100)}%")
-
-            state_probs = results.get('state_probabilities', {})
-            if state_probs:
-                with st.expander("Regime probability distribution"):
-                    for regime_name, prob in state_probs.items():
-                        st.write(f"- {regime_name}: {prob}%")
-
-            history = results.get('regime_history', [])
-            if history:
-                with st.expander("Recent regime history"):
-                    for item in history[-10:]:
-                        st.write(f"{item['date']} — {item['regime']} ({item['confidence']}%)")
-
-            model_summary = next(
-                (item for item in results['results'] if item['model'] == st.session_state.admin_ai_model),
-                None
-            )
-            if model_summary:
-                st.markdown("#### Selected model impact")
-                sm_cols = st.columns([2, 2, 2])
-                sm_cols[0].metric("Model", model_summary['model'])
-                sm_cols[1].metric("Prediction", f"₹{model_summary['prediction']}")
-                sm_cols[2].metric("Confidence", f"{model_summary['confidence']}%")
-                st.markdown(f"**Model regime:** {model_summary['regime']}")
-                st.markdown(f"**Model reasoning:** {model_summary['reasoning']}")
-                st.markdown("---")
-
-            st.markdown("---")
-
-            for model_result in results['results']:
-                with st.expander(f"{model_result['model']} — ₹{model_result['prediction']} ({model_result['confidence']}%)"):
-                    st.markdown(f"**Regime:** {model_result['regime']}")
-                    st.markdown(f"**Summary:** {model_result['summary']}")
-                    st.markdown(f"**Reasoning:** {model_result['reasoning']}")
-
-            st.markdown("---")
-            st.markdown("#### Forecast architecture notes")
-            st.write("This admin-only engine is built as a modular hybrid forecast system with placeholder Transformer, GNN, and sequence model components. It is designed to evolve into a full next-gen AI forecasting architecture.")
     elif st.session_state.admin_ai_stock:
         st.info("Click 'Analyze Now' to run the selected admin AI model and return a consensus forecast.")
     else:
