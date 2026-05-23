@@ -13,6 +13,8 @@ from datetime import datetime
 import joblib
 import json
 
+from StockSageAI.utils import calculate_technical_indicators
+
 try:
     import tensorflow as tf
     from tensorflow import keras
@@ -56,6 +58,17 @@ MODEL_FILES = {
     'CatBoost': 'models/catboost_model.pkl',
     'LightGBM': 'models/lightgbm_model.pkl'
 }
+
+FEATURE_COLUMNS = [
+    'MA5',
+    'MA20',
+    'MA50',
+    'RSI',
+    'MACD',
+    'ATR',
+    'Volume_Ratio',
+    'Price_Range'
+]
 
 # ============================================================================
 # TRAINED MODEL MANAGER
