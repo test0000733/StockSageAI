@@ -2347,7 +2347,7 @@ def show_admin_ai_forecasting():
         st.markdown(f"### Selected symbol: **{admin_ai_stock}**")
         
         # Import trained model manager - 5 visible models only
-        from trained_model_manager import (
+        from StockSageAI.trained_model_manager import (
             get_visible_model_names,
             get_all_model_names,
             get_model_manager
@@ -2569,48 +2569,100 @@ def get_cached_admin_ai_results(symbol, model_tuple, refresh_counter=0):
     if not symbol or not model_tuple:
         return None
 
-    model_results = []
-    for model_name in model_tuple:
-        result = ai_forecast_engine.analyze_stock(symbol, model_name)
-        if isinstance(result, dict):
-            model_results.append(result)
+    from StockSageAI.trained_model_manager import get_model_manager, get_visible_model_names
+    from StockSageAI.utils import calculate_technical_indicators
 
-    if not model_results:
-        return {'error': 'No forecast results were generated.'}
-
-    if len(model_results) == 1:
-        return model_results[0]
-
-    # Build a combined ensemble summary
-    predictions = [res.get('current_price', 0) for res in model_results if res.get('current_price') is not None]
-    confidences = [res.get('confidence', 0) for res in model_results if res.get('confidence') is not None]
-    ensemble_value = sum(predictions) / len(predictions) if predictions else 0
-    average_confidence = sum(confidences) / len(confidences) if confidences else 0
-
-    combined = {
-        'current_price': model_results[0].get('current_price', 0),
-        'ensemble': ensemble_value,
-        'confidence': average_confidence,
-        'regime': model_results[0].get('regime', 'Mixed'),
-        'regime_confidence': average_confidence,
-        'anomaly_score': sum(res.get('anomaly_score', 0) for res in model_results) / len(model_results),
-        'recommended_weights': {m: 1 / len(model_results) for m in model_tuple},
-        'state_probabilities': model_results[0].get('state_probabilities', {}),
-        'regime_history': model_results[0].get('regime_history', []),
-        'results': []
-    }
-    for res in model_results:
-        summary = {
-            'model': res.get('model', 'Unknown'),
-            'prediction': res.get('prediction', res.get('current_price', 0)),
-            'confidence': res.get('confidence', 0),
-            'regime': res.get('regime', 'Unknown'),
-            'reasoning': res.get('reasoning', ''),
-            'summary': res.get('summary', '')
+    data_fetcher = DataFetcher()
+    df = data_fetcher.get_stock_data(symbol, period='2y')
+    if df is None or df.empty:
+        return {
+            'error': 'Unable to fetch price series for this symbol.',
+            'results': []
         }
-        combined['results'].append(summary)
 
-    return combined
+    df = calculate_technical_indicators(df.copy())
+    df['MA5'] = df['Close'].rolling(window=5).mean()
+    df['MA20'] = df['Close'].rolling(window=20).mean()
+    df['MA50'] = df['Close'].rolling(window=50).mean()
+    df['ATR'] = (df['High'] - df['Low']).rolling(window=14).mean()
+    df['Volume_Ratio'] = df['Volume'] / (df['Volume'].rolling(window=20).mean() + 1e-9)
+    df['Price_Range'] = (df['High'] - df['Low']) / (df['Close'] + 1e-9)
+    df = df.dropna(subset=['MA5', 'MA20', 'MA50', 'RSI', 'MACD', 'ATR', 'Volume_Ratio', 'Price_Range'])
+
+    if df.shape[0] < 60:
+        return {
+            'error': 'Not enough data available to generate model inputs.',
+            'results': []
+        }
+
+    feature_columns = ['MA5', 'MA20', 'MA50', 'RSI', 'MACD', 'ATR', 'Volume_Ratio', 'Price_Range']
+    X_features = df[feature_columns].iloc[-1:].astype(float).to_numpy()
+    X_seq = df[feature_columns].iloc[-60:].astype(float).to_numpy().reshape(1, 60, len(feature_columns))
+
+    manager = get_model_manager()
+    visible_model_names = get_visible_model_names()
+    selected_visible_models = [name for name in model_tuple if name in visible_model_names]
+    if not selected_visible_models:
+        selected_visible_models = visible_model_names
+
+    results = manager.ensemble_predict_all_8_models(
+        X_seq,
+        X_features,
+        selected_visible_models=selected_visible_models
+    )
+
+    if results.get('error'):
+        # Fallback to legacy AI forecast engine if trained models are unavailable.
+        model_results = []
+        for model_name in model_tuple:
+            result = ai_forecast_engine.analyze_stock(symbol, model_name)
+            if isinstance(result, dict):
+                model_results.append(result)
+
+        if not model_results:
+            return {'error': 'No forecast results were generated.', 'results': []}
+
+        if len(model_results) == 1:
+            return model_results[0]
+
+        predictions = [res.get('current_price', 0) for res in model_results if res.get('current_price') is not None]
+        confidences = [res.get('confidence', 0) for res in model_results if res.get('confidence') is not None]
+        ensemble_value = sum(predictions) / len(predictions) if predictions else 0
+        average_confidence = sum(confidences) / len(confidences) if confidences else 0
+        combined = {
+            'current_price': model_results[0].get('current_price', 0),
+            'ensemble': ensemble_value,
+            'confidence': average_confidence,
+            'regime': model_results[0].get('regime', 'Mixed'),
+            'regime_confidence': average_confidence,
+            'anomaly_score': sum(res.get('anomaly_score', 0) for res in model_results) / len(model_results),
+            'recommended_weights': {m: 1 / len(model_results) for m in model_tuple},
+            'state_probabilities': model_results[0].get('state_probabilities', {}),
+            'regime_history': model_results[0].get('regime_history', []),
+            'results': []
+        }
+        for res in model_results:
+            summary = {
+                'model': res.get('model', 'Unknown'),
+                'prediction': res.get('prediction', res.get('current_price', 0)),
+                'confidence': res.get('confidence', 0),
+                'regime': res.get('regime', 'Unknown'),
+                'reasoning': res.get('reasoning', ''),
+                'summary': res.get('summary', '')
+            }
+            combined['results'].append(summary)
+
+        return combined
+
+    # Fill in standard fields for trained model results
+    results['current_price'] = float(df['Close'].iloc[-1]) if 'Close' in df.columns else 0.0
+    results['symbol'] = symbol
+    if 'regime' not in results:
+        results['regime'] = 'Adaptive Mixed Market'
+    if 'results' not in results:
+        results['results'] = []
+
+    return results
 
 
 def show_analytics():

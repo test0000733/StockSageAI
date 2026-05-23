@@ -106,6 +106,34 @@ class TrainedModelManager:
         except Exception as e:
             logger.warning(f"Error loading scalers: {e}")
 
+    def prepare_input_data(self, df, sequence_length: int = 60):
+        """Build feature matrices for model inference."""
+        if df is None or df.empty:
+            return None, None
+
+        df = df.copy()
+        df['MA5'] = df['Close'].rolling(window=5).mean()
+        df['MA20'] = df['Close'].rolling(window=20).mean()
+        df['MA50'] = df['Close'].rolling(window=50).mean()
+        df['ATR'] = (df['High'] - df['Low']).rolling(window=14).mean()
+        df['Volume_Ratio'] = df['Volume'] / (df['Volume'].rolling(window=20).mean() + 1e-9)
+        df['Price_Range'] = (df['High'] - df['Low']) / (df['Close'] + 1e-9)
+
+        df['RSI'] = df['Close'].diff().apply(lambda x: x if x > 0 else 0).rolling(window=14).mean()
+        df['MACD'] = df['Close'].ewm(span=12).mean() - df['Close'].ewm(span=26).mean()
+
+        feature_columns = FEATURE_COLUMNS
+        if df.shape[0] < sequence_length or any(col not in df.columns for col in feature_columns):
+            return None, None
+
+        df = df.dropna(subset=feature_columns)
+        if df.shape[0] < sequence_length:
+            return None, None
+
+        X_seq = df[feature_columns].iloc[-sequence_length:].astype(float).to_numpy().reshape(1, sequence_length, len(feature_columns))
+        X_features = df[feature_columns].iloc[-1:].astype(float).to_numpy()
+        return X_seq, X_features
+
     def get_model(self, model_name: str, force_reload: bool = False):
         """
         Get trained model by name
@@ -248,16 +276,18 @@ class TrainedModelManager:
         self,
         X_seq: np.ndarray,
         X_features: np.ndarray,
+        selected_visible_models: List[str] = None,
         weights: Dict[str, float] = None
     ) -> Dict:
         """
-        Get predictions from all 8 models and ensemble them
-        
+        Get predictions from selected visible models plus all 3 background models and ensemble them.
+
         Args:
             X_seq: Sequence data (1, 60, 8) for LSTM models
             X_features: Feature data (1, 8) for GB models
+            selected_visible_models: Subset of visible models to run
             weights: Custom weights for each model (default: auto-weighted)
-            
+
         Returns:
             Ensemble prediction dict with all model outputs
         """
@@ -265,27 +295,36 @@ class TrainedModelManager:
             'timestamp': datetime.now().isoformat(),
             'visible_predictions': {},
             'background_predictions': {},
+            'results': [],
             'ensemble_prediction': None,
             'ensemble_confidence': None,
+            'recommended_weights': {},
             'error': None
         }
 
-        # Get all models
+        # Load models once
         all_models = self.get_all_models()
 
-        # Default weights: visible models 60% (12% each), background 40% (13.33% each)
+        selected_visible_models = selected_visible_models or VISIBLE_MODELS
+        selected_visible_models = [m for m in selected_visible_models if m in VISIBLE_MODELS]
+        if not selected_visible_models:
+            selected_visible_models = VISIBLE_MODELS.copy()
+
+        # Default weights: visible models 60% total, background 40% total
+        visible_weight = 0.60 / max(len(selected_visible_models), 1)
+        background_weight = 0.40 / max(len(BACKGROUND_MODELS), 1)
         if weights is None:
             weights = {}
-            for model in VISIBLE_MODELS:
-                weights[model] = 0.12
+            for model in selected_visible_models:
+                weights[model] = visible_weight
             for model in BACKGROUND_MODELS:
-                weights[model] = 0.1333
+                weights[model] = background_weight
 
         predictions = []
         confidences = []
 
-        # LSTM models (visible)
-        for model_name in VISIBLE_MODELS:
+        # Visible LSTM models
+        for model_name in selected_visible_models:
             if model_name not in all_models:
                 logger.warning(f"Skipping {model_name} - not loaded")
                 continue
@@ -293,20 +332,29 @@ class TrainedModelManager:
             try:
                 model = all_models[model_name]
                 pred, conf = self.predict_lstm(model, X_seq)
-
                 if pred is not None:
+                    model_weight = weights.get(model_name, visible_weight)
                     results['visible_predictions'][model_name] = {
                         'prediction': pred,
                         'confidence': conf,
-                        'weight': weights.get(model_name, 0.12)
+                        'weight': model_weight
                     }
-                    predictions.append(pred * weights.get(model_name, 0.12))
+                    predictions.append(pred * model_weight)
                     confidences.append(conf)
+                    results['recommended_weights'][model_name] = model_weight
+                    results['results'].append({
+                        'model': model_name,
+                        'prediction': pred,
+                        'confidence': conf,
+                        'regime': 'Trend-based',
+                        'reasoning': 'Deep learning sequence model output',
+                        'summary': ''
+                    })
 
             except Exception as e:
                 logger.error(f"Error predicting with {model_name}: {e}")
 
-        # Gradient boosting models (background)
+        # Background gradient boosting models
         for model_name in BACKGROUND_MODELS:
             if model_name not in all_models:
                 logger.warning(f"Skipping {model_name} - not loaded")
@@ -315,22 +363,30 @@ class TrainedModelManager:
             try:
                 model = all_models[model_name]
                 pred, conf = self.predict_gradient_boosting(model, X_features)
-
                 if pred is not None:
+                    model_weight = weights.get(model_name, background_weight)
                     results['background_predictions'][model_name] = {
                         'prediction': pred,
                         'confidence': conf,
-                        'weight': weights.get(model_name, 0.1333)
+                        'weight': model_weight
                     }
-                    predictions.append(pred * weights.get(model_name, 0.1333))
+                    predictions.append(pred * model_weight)
                     confidences.append(conf)
+                    results['recommended_weights'][model_name] = model_weight
+                    results['results'].append({
+                        'model': model_name,
+                        'prediction': pred,
+                        'confidence': conf,
+                        'regime': 'Gradient boosting',
+                        'reasoning': 'Tabular gradient boosting model output',
+                        'summary': ''
+                    })
 
             except Exception as e:
                 logger.error(f"Error predicting with {model_name}: {e}")
 
-        # Calculate ensemble
         if predictions:
-            results['ensemble_prediction'] = sum(predictions)
+            results['ensemble_prediction'] = float(sum(predictions))
             results['ensemble_confidence'] = float(np.mean(confidences))
             logger.info(f"Ensemble prediction: ${results['ensemble_prediction']:.2f} (confidence: {results['ensemble_confidence']:.1f}%)")
         else:
