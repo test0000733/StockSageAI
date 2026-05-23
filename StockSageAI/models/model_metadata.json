@@ -1,0 +1,41 @@
+{
+  "created_at": "2026-05-23T17:39:50.467051",
+  "models": {
+    "Transformer LSTM": {
+      "mse": 0.005977684362009629
+    },
+    "BiLSTM Ensemble": {
+      "mse": 0.008573819600613288
+    },
+    "CNN-BiLSTM": {
+      "mse": 0.003773096649029085
+    },
+    "Attention LSTM": {
+      "mse": 0.0056746881347086746
+    },
+    "TCN": {
+      "mse": 0.008307883555142358
+    },
+    "XGBoost": {
+      "mse": 0.27278548324541585
+    },
+    "CatBoost": {
+      "mse": 0.39500431428906896
+    },
+    "LightGBM": {
+      "mse": 0.00251564225829497
+    }
+  },
+  "sequence_length": 60,
+  "feature_columns": [
+    "MA5",
+    "MA20",
+    "MA50",
+    "RSI",
+    "MACD",
+    "ATR",
+    "Volume_Ratio",
+    "Price_Range"
+  ],
+  "training_samples": 311
+}

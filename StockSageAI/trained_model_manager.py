@@ -49,11 +49,11 @@ ALL_MODELS = VISIBLE_MODELS + BACKGROUND_MODELS
 
 # Model file mapping
 MODEL_FILES = {
-    'Transformer LSTM': 'models/transformer_lstm.h5',
-    'BiLSTM Ensemble': 'models/bilstm_ensemble.h5',
-    'CNN-BiLSTM': 'models/cnn_bilstm.h5',
-    'Attention LSTM': 'models/attention_lstm.h5',
-    'TCN': 'models/tcn_model.h5',
+    'Transformer LSTM': 'models/transformer_lstm.pkl',
+    'BiLSTM Ensemble': 'models/bilstm_ensemble.pkl',
+    'CNN-BiLSTM': 'models/cnn_bilstm.pkl',
+    'Attention LSTM': 'models/attention_lstm.pkl',
+    'TCN': 'models/tcn_model.pkl',
     'XGBoost': 'models/xgboost_model.pkl',
     'CatBoost': 'models/catboost_model.pkl',
     'LightGBM': 'models/lightgbm_model.pkl'
@@ -106,6 +106,30 @@ class TrainedModelManager:
         except Exception as e:
             logger.warning(f"Error loading scalers: {e}")
 
+    def resolve_model_path(self, model_name: str) -> Optional[str]:
+        """Resolve the model artifact path by extension fallback."""
+        expected_file = MODEL_FILES.get(model_name)
+        if expected_file is None:
+            return None
+
+        expected_path = os.path.join(self.model_dir, os.path.basename(expected_file))
+        if os.path.exists(expected_path):
+            return expected_path
+
+        base_name, _ = os.path.splitext(os.path.basename(expected_file))
+        for ext in ['.pkl', '.joblib', '.h5', '.keras']:
+            candidate = os.path.join(self.model_dir, f"{base_name}{ext}")
+            if os.path.exists(candidate):
+                return candidate
+
+        # Best effort: search for a matching base name with supported extension
+        expected_lower = base_name.lower()
+        for fn in os.listdir(self.model_dir):
+            if fn.lower().startswith(expected_lower) and os.path.splitext(fn)[1].lower() in ['.pkl', '.joblib', '.h5', '.keras']:
+                return os.path.join(self.model_dir, fn)
+
+        return None
+
     def prepare_input_data(self, df, sequence_length: int = 60):
         """Build feature matrices for model inference."""
         if df is None or df.empty:
@@ -153,22 +177,23 @@ class TrainedModelManager:
         if model_name in self.loaded_models and not force_reload:
             return self.loaded_models[model_name]
 
-        # Load from disk
-        model_path = os.path.join(self.model_dir, MODEL_FILES[model_name].split('/')[-1])
-        
-        if not os.path.exists(model_path):
-            logger.error(f"Model file not found: {model_path}")
+        # Load from disk with extension fallback support
+        model_path = self.resolve_model_path(model_name)
+        if model_path is None:
+            logger.error(f"Model file not found for: {model_name}")
             return None
 
         try:
-            if model_name in VISIBLE_MODELS:
-                # Deep learning models
+            _, ext = os.path.splitext(model_path)
+            if ext in ['.pkl', '.joblib']:
+                model = joblib.load(model_path)
+            elif ext in ['.h5', '.keras']:
                 if not TF_AVAILABLE:
                     logger.error("TensorFlow not available for loading deep learning models")
                     return None
                 model = tf.keras.models.load_model(model_path)
             else:
-                # Gradient boosting models
+                # Default fallback for model artifacts
                 model = joblib.load(model_path)
 
             self.loaded_models[model_name] = model
@@ -224,8 +249,16 @@ class TrainedModelManager:
             (prediction_value, confidence_percent)
         """
         try:
-            pred_scaled = model.predict(X_seq, verbose=0)[0][0]
-            
+            if TF_AVAILABLE and hasattr(model, 'predict') and hasattr(model, 'layers'):
+                pred_scaled = model.predict(X_seq, verbose=0)[0][0]
+            else:
+                X_flat = X_seq.reshape(len(X_seq), -1)
+                pred_scaled = model.predict(X_flat)
+                if hasattr(pred_scaled, '__iter__'):
+                    pred_scaled = float(pred_scaled[0])
+                else:
+                    pred_scaled = float(pred_scaled)
+
             # Inverse scale prediction
             if self.scaler_y is not None:
                 pred_value = self.scaler_y.inverse_transform([[pred_scaled]])[0][0]
@@ -242,19 +275,25 @@ class TrainedModelManager:
             logger.error(f"Error in LSTM prediction: {e}")
             return None, None
 
-    def predict_gradient_boosting(self, model, X_features: np.ndarray) -> Tuple[float, float]:
+    def predict_gradient_boosting(self, model, X_features: np.ndarray, X_seq: np.ndarray = None) -> Tuple[float, float]:
         """
         Get prediction from gradient boosting model
         
         Args:
             model: Loaded GB model (XGBoost, CatBoost, LightGBM)
-            X_features: Feature array of shape (1, 8)
+            X_features: Feature array of shape (1, n_features) or sequence input
+            X_seq: Optional sequence data of shape (1, sequence_length, n_features)
             
         Returns:
             (prediction_value, confidence_percent)
         """
         try:
-            pred_value = model.predict(X_features)[0]
+            if X_seq is not None and isinstance(X_seq, np.ndarray) and X_seq.ndim == 3:
+                X_input = X_seq.reshape(len(X_seq), -1)
+            else:
+                X_input = X_features.reshape(len(X_features), -1)
+
+            pred_value = model.predict(X_input)[0]
 
             # Estimate confidence based on model type
             model_type = type(model).__name__
@@ -262,7 +301,7 @@ class TrainedModelManager:
                 confidence = 80 + np.random.uniform(-5, 5)
             elif 'CatBoost' in model_type:
                 confidence = 78 + np.random.uniform(-5, 5)
-            else:  # LightGBM
+            else:  # LightGBM or generic gradient boosting
                 confidence = 76 + np.random.uniform(-5, 5)
 
             confidence = np.clip(confidence, 70, 90)
@@ -362,7 +401,7 @@ class TrainedModelManager:
 
             try:
                 model = all_models[model_name]
-                pred, conf = self.predict_gradient_boosting(model, X_features)
+                pred, conf = self.predict_gradient_boosting(model, X_features, X_seq=X_seq)
                 if pred is not None:
                     model_weight = weights.get(model_name, background_weight)
                     results['background_predictions'][model_name] = {
@@ -406,14 +445,11 @@ class TrainedModelManager:
         }
 
         for model_name in ALL_MODELS:
-            file_name = MODEL_FILES[model_name].split('/')[-1]
-            file_path = os.path.join(self.model_dir, file_name)
-            is_available = os.path.exists(file_path)
-
-            if is_available:
-                file_size = os.path.getsize(file_path) / (1024 * 1024)  # MB
+            resolved_path = self.resolve_model_path(model_name)
+            if resolved_path and os.path.exists(resolved_path):
+                file_size = os.path.getsize(resolved_path) / (1024 * 1024)  # MB
                 status['models_available'][model_name] = {
-                    'file': file_name,
+                    'file': os.path.basename(resolved_path),
                     'size_mb': f"{file_size:.1f}",
                     'type': 'LSTM' if model_name in VISIBLE_MODELS else 'Gradient Boosting'
                 }

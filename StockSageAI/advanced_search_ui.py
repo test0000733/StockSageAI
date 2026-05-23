@@ -600,7 +600,7 @@ class AdvancedStockSearch:
             """
 
             st.markdown(result_html, unsafe_allow_html=True)
-            if st.button(f"Analyze {symbol}", key=f"analyze_btn_{i}", width='stretch'):
+            if st.button(f"Analyze {symbol}", key=f"analyze_btn_{i}", use_container_width=True):
                 st.session_state.current_stock = symbol
                 if hasattr(self, 'on_stock_select') and self.on_stock_select:
                     self.on_stock_select(stock)
@@ -638,7 +638,7 @@ class AdvancedStockSearch:
 
                 with cols[idx % 3]:
                     st.markdown(card_content, unsafe_allow_html=True)
-                    if st.button(f"Select {symbol}", key=f"popular_stock_{idx}", width='stretch'):
+                    if st.button(f"Select {symbol}", key=f"popular_stock_{idx}", use_container_width=True):
                         st.session_state.current_stock = symbol
                         if hasattr(self, 'on_stock_select') and self.on_stock_select:
                             self.on_stock_select(stock)
