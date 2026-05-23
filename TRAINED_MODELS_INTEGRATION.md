@@ -12,15 +12,15 @@ This document describes how to integrate and use the 8 trained ML models in SP 0
 ```
 StockSageAI/
 ├── models/                          # Model storage directory
-│   ├── transformer_lstm.h5           # Model 1: Transformer LSTM (Deep Learning)
-│   ├── bilstm_ensemble.h5            # Model 2: BiLSTM Ensemble (Deep Learning)
-│   ├── cnn_bilstm.h5                 # Model 3: CNN-BiLSTM (Hybrid)
-│   ├── attention_lstm.h5             # Model 4: Attention LSTM (Deep Learning)
-│   ├── tcn_model.h5                  # Model 5: Temporal Convolutional Network
-│   ├── xgboost_model.pkl             # Model 6: XGBoost (Background)
-│   ├── catboost_model.pkl            # Model 7: CatBoost (Background)
-│   ├── lightgbm_model.pkl            # Model 8: LightGBM (Background)
-│   └── scalers.pkl                   # Preprocessing scalers (X and y)
+│   ├── transformer_lstm.pkl           # Model 1: Transformer LSTM proxy
+│   ├── bilstm_ensemble.pkl            # Model 2: BiLSTM Ensemble proxy
+│   ├── cnn_bilstm.pkl                 # Model 3: CNN-BiLSTM proxy
+│   ├── attention_lstm.pkl             # Model 4: Attention LSTM proxy
+│   ├── tcn_model.pkl                  # Model 5: Temporal Convolutional Network proxy
+│   ├── xgboost_model.pkl              # Model 6: XGBoost style gradient boosting proxy
+│   ├── catboost_model.pkl             # Model 7: CatBoost style gradient boosting proxy
+│   ├── lightgbm_model.pkl             # Model 8: LightGBM style gradient boosting proxy
+│   └── scalers.pkl                    # Preprocessing scalers (X and y)
 │
 ├── trained_model_manager.py          # Model manager class
 └── app.py                            # Main app with admin panel integration
@@ -68,12 +68,12 @@ mkdir -p StockSageAI/models
 Use the Google Colab training notebook: `GOOGLE_COLAB_TRAINING_GUIDE.md`
 
 ### Step 3: Download Trained Models
-After training in Colab, download all 8 model files:
-- `transformer_lstm.h5`
-- `bilstm_ensemble.h5`
-- `cnn_bilstm.h5`
-- `attention_lstm.h5`
-- `tcn_model.h5`
+After training in Colab, download all 8 model files. If you are using the local build flow, the artifact names are:
+- `transformer_lstm.pkl`
+- `bilstm_ensemble.pkl`
+- `cnn_bilstm.pkl`
+- `attention_lstm.pkl`
+- `tcn_model.pkl`
 - `xgboost_model.pkl`
 - `catboost_model.pkl`
 - `lightgbm_model.pkl`
@@ -204,7 +204,7 @@ Ensemble_Confidence = Average(All_Model_Confidences)
 1. Check models directory exists: `StockSageAI/models/`
 2. Verify all 8 files are present
 3. Check file permissions (readable)
-4. View logs: `Model not found: transformer_lstm.h5`
+4. View logs: `Model not found: transformer_lstm.pkl`
 
 ### Memory Issues
 - Keep only loaded models in RAM

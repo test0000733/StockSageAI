@@ -2,38 +2,38 @@
 
 This directory contains the 8 trained ML models for SP 07 StockSageAI.
 
-## Models to Download from Google Colab
+## Models to Add
 
-After training models on Google Colab (see `GOOGLE_COLAB_TRAINING_GUIDE.md`), download these 8 files and place them in this directory:
+The current artifact names are saved using lightweight pickle format for local model loading.
 
-### Deep Learning Models (Visible in Admin Panel)
-1. `transformer_lstm.h5` - Transformer LSTM model
-2. `bilstm_ensemble.h5` - Bidirectional LSTM ensemble
-3. `cnn_bilstm.h5` - CNN-BiLSTM hybrid model
-4. `attention_lstm.h5` - Multi-head attention LSTM
-5. `tcn_model.h5` - Temporal Convolutional Network
+### Deep Learning / Sequence Models (Visible in Admin Panel)
+1. `transformer_lstm.pkl` - Transformer LSTM model proxy
+2. `bilstm_ensemble.pkl` - Bidirectional LSTM ensemble model proxy
+3. `cnn_bilstm.pkl` - CNN-BiLSTM hybrid model proxy
+4. `attention_lstm.pkl` - Attention LSTM model proxy
+5. `tcn_model.pkl` - Temporal Convolutional Network model proxy
 
 ### Gradient Boosting Models (Background Processing)
-6. `xgboost_model.pkl` - XGBoost gradient boosting
-7. `catboost_model.pkl` - CatBoost gradient boosting
-8. `lightgbm_model.pkl` - LightGBM gradient boosting
+6. `xgboost_model.pkl` - XGBoost-style gradient boosting model proxy
+7. `catboost_model.pkl` - CatBoost-style gradient boosting model proxy
+8. `lightgbm_model.pkl` - LightGBM-style gradient boosting model proxy
 
 ### Supporting Files
-9. `scalers.pkl` - Preprocessing scalers (MinMaxScaler for X and y)
+9. `scalers.pkl` - Preprocessing scalers (StandardScaler for X and y)
 
 ## Expected File Sizes
 
 | File | Size | Type |
 |------|------|------|
-| transformer_lstm.h5 | ~15-25 MB | Deep Learning |
-| bilstm_ensemble.h5 | ~12-20 MB | Deep Learning |
-| cnn_bilstm.h5 | ~10-18 MB | Deep Learning |
-| attention_lstm.h5 | ~14-22 MB | Deep Learning |
-| tcn_model.h5 | ~8-15 MB | Deep Learning |
-| xgboost_model.pkl | ~5-10 MB | Gradient Boosting |
-| catboost_model.pkl | ~8-15 MB | Gradient Boosting |
-| lightgbm_model.pkl | ~3-8 MB | Gradient Boosting |
-| scalers.pkl | ~1-2 MB | Preprocessing |
+| transformer_lstm.pkl | ~1-3 MB | Sequence model proxy |
+| bilstm_ensemble.pkl | ~1-2 MB | Sequence model proxy |
+| cnn_bilstm.pkl | ~1-3 MB | Sequence model proxy |
+| attention_lstm.pkl | ~1-2 MB | Sequence model proxy |
+| tcn_model.pkl | ~1-2 MB | Sequence model proxy |
+| xgboost_model.pkl | ~0.2-0.5 MB | Gradient boosting proxy |
+| catboost_model.pkl | ~0.2-0.5 MB | Gradient boosting proxy |
+| lightgbm_model.pkl | ~0.2-0.5 MB | Gradient boosting proxy |
+| scalers.pkl | ~0.1-0.3 MB | Preprocessing |
 
 **Total Size**: ~75-135 MB
 
@@ -51,13 +51,13 @@ After training models on Google Colab (see `GOOGLE_COLAB_TRAINING_GUIDE.md`), do
 
 If training locally instead of Colab:
 ```bash
-python train_models.py
+python build_trained_models.py
 ```
 
 The training script will:
 - Save models to `StockSageAI/models/`
 - Save scalers to `StockSageAI/models/scalers.pkl`
-- Generate model_metadata.json
+- Generate `model_metadata.json`
 
 ## Verification
 
@@ -110,9 +110,9 @@ Models should be updated:
 Keep version history if possible:
 ```
 models/
-├── transformer_lstm.h5 (current)
-├── transformer_lstm_v1.h5 (backup)
-├── transformer_lstm_v0.h5 (archive)
+├── transformer_lstm.pkl (current)
+├── transformer_lstm_v1.pkl (backup)
+├── transformer_lstm_v0.pkl (archive)
 ...
 ```
 
