@@ -2383,10 +2383,14 @@ def show_admin_ai_forecasting():
             st.session_state.admin_ai_model = available_models[0]
             admin_ai_model = available_models[0]
 
+        # Ensure the session state key exists before creating the widget
+        if 'admin_ai_selected_models' not in st.session_state:
+            st.session_state['admin_ai_selected_models'] = [admin_ai_model]
+
         selected_models = st.multiselect(
             "Select AI models to run (5 models + 3 background ensemble)",
             options=available_models,
-            default=[admin_ai_model],
+            default=st.session_state.get('admin_ai_selected_models', [admin_ai_model]),
             key='admin_ai_selected_models'
         )
 
@@ -2432,8 +2436,8 @@ def show_admin_ai_forecasting():
             )
             st.session_state.admin_ai_auto_run = False
 
-        if 'admin_ai_selected_models' not in st.session_state or not st.session_state.get('admin_ai_selected_models'):
-            st.session_state.admin_ai_selected_models = [admin_ai_model]
+        # session state for `admin_ai_selected_models` is initialized before the widget;
+        # do not reassign it after the widget is created (Streamlit disallows this).
 
         admin_ai_results = st.session_state.get('admin_ai_results')
         if admin_ai_results:
@@ -2497,7 +2501,7 @@ def show_admin_ai_forecasting():
             st.info("Click 'Analyze Now' or 'Run Ensemble' to execute the selected admin AI models.")
         else:
             st.info("Search a stock name above to auto-select it and start the admin AI analysis.")
-    elif st.session_state.admin_ai_stock:
+    elif st.session_state.get('admin_ai_stock', ''):
         st.info("Click 'Analyze Now' to run the selected admin AI model and return a consensus forecast.")
     else:
         st.info("Search a stock name above to auto-select it and start the admin AI analysis.")
