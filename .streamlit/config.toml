@@ -2,6 +2,7 @@
 headless = true
 enableCORS = false
 enableXsrfProtection = true
+fileWatcherType = "none"
 
 [client]
 showErrorDetails = false

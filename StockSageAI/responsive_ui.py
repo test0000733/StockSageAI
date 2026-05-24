@@ -4,7 +4,6 @@ Ensures responsive design across all devices and platforms
 """
 
 import streamlit as st
-import streamlit.components.v1 as components
 from typing import Callable, Optional, Dict, Any
 
 # ============================================================================
@@ -446,22 +445,27 @@ def ensure_viewport_width(default_width: int = 1024):
 
     # Try injecting JS to capture viewport width when running inside Streamlit.
     try:
-        components.html(
-            """
-            <script>
-            const params = new URLSearchParams(window.location.search);
-            params.set('vw', window.innerWidth);
-            window.location.search = params.toString();
-            </script>
-            """,
-            height=0,
-        )
-        # After injecting script, request a rerun/stop so Streamlit reloads with vw param.
+        # Build a data URL containing the small JS snippet and render it in an iframe.
+        # Using an iframe avoids the deprecated `components.html` API.
+        import urllib.parse
+
+        js = """
+        <script>
+        const params = new URLSearchParams(window.location.search);
+        params.set('vw', window.innerWidth);
+        window.location.search = params.toString();
+        </script>
+        """
+
+        data_url = "data:text/html;charset=utf-8," + urllib.parse.quote(js)
+        st.iframe(data_url, height=0)
+
+        # After injecting script, request a rerun so Streamlit reloads with vw param.
         try:
             st.stop()
         except Exception:
             # If st.stop is unavailable or raises (non-Streamlit run), ignore.
             pass
     except Exception:
-        # If components.html isn't available (non-Streamlit runtime), skip silently.
+        # If iframe injection fails (non-Streamlit runtime), skip silently.
         return
