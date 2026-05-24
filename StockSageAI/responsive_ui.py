@@ -420,10 +420,23 @@ def render_mobile_navbar(nav_items: Dict[str, Callable]):
 
 def ensure_viewport_width(default_width: int = 1024):
     """Detect viewport width in the browser and store it in session state."""
-    if 'viewport_width' in st.session_state:
+    # If session_state already has a value, do nothing.
+    try:
+        if 'viewport_width' in st.session_state:
+            return
+    except Exception:
+        # session_state may not be functional outside `streamlit run`.
         return
 
-    query_params = st.experimental_get_query_params()
+    # Safely attempt to read query params; some Streamlit versions or
+    # execution contexts may not expose experimental_get_query_params.
+    query_params = {}
+    try:
+        if hasattr(st, 'experimental_get_query_params'):
+            query_params = st.experimental_get_query_params() or {}
+    except Exception:
+        query_params = {}
+
     if 'vw' in query_params:
         try:
             st.session_state['viewport_width'] = int(float(query_params['vw'][0]))
@@ -431,15 +444,24 @@ def ensure_viewport_width(default_width: int = 1024):
             st.session_state['viewport_width'] = default_width
         return
 
-    # Use JavaScript to capture the viewport width on first load.
-    components.html(
-        """
-        <script>
-        const params = new URLSearchParams(window.location.search);
-        params.set('vw', window.innerWidth);
-        window.location.search = params.toString();
-        </script>
-        """,
-        height=0,
-    )
-    st.stop()
+    # Try injecting JS to capture viewport width when running inside Streamlit.
+    try:
+        components.html(
+            """
+            <script>
+            const params = new URLSearchParams(window.location.search);
+            params.set('vw', window.innerWidth);
+            window.location.search = params.toString();
+            </script>
+            """,
+            height=0,
+        )
+        # After injecting script, request a rerun/stop so Streamlit reloads with vw param.
+        try:
+            st.stop()
+        except Exception:
+            # If st.stop is unavailable or raises (non-Streamlit run), ignore.
+            pass
+    except Exception:
+        # If components.html isn't available (non-Streamlit runtime), skip silently.
+        return
