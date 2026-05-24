@@ -87,6 +87,22 @@ try:
 except Exception:
     pass
 st.markdown(responsive_ui.MOBILE_FIRST_STYLES, unsafe_allow_html=True)
+responsive_ui.ensure_viewport_width()
+
+# Initialize commonly-used session state keys to avoid AttributeError
+defaults = {
+    'search_query': '',
+    'admin_ai_stock': '',
+    'admin_ai_selected_models': [],
+    'admin_ai_auto_run': False,
+    'admin_ai_results': None,
+    'admin_ai_refresh_counter': 0,
+    'admin_ai_model': None,
+}
+for k, v in defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
 if 'search_query' not in st.session_state:
     st.session_state.search_query = ''
 if 'admin_ai_stock' not in st.session_state:
@@ -566,7 +582,7 @@ def show_login_page():
         password = st.text_input("Password", type="password", key="login_password")
         remember_me = st.checkbox("Remember me", key="remember_me")
 
-        col1, col2 = st.columns(2)
+        col1, col2 = responsive_ui.get_responsive_columns(2, mobile_count=1)
         with col1:
             login_submitted = st.form_submit_button("Login", use_container_width=True)
         with col2:
@@ -625,7 +641,7 @@ def show_signup_page():
         password = st.text_input("Password", type="password", key="signup_password")
         confirm_password = st.text_input("Confirm Password", type="password", key="signup_confirm")
 
-        col1, col2 = st.columns(2)
+        col1, col2 = responsive_ui.get_responsive_columns(2, mobile_count=1)
         with col1:
             signup_submitted = st.form_submit_button("Sign Up", use_container_width=True)
         with col2:
@@ -658,7 +674,7 @@ def show_forgot_password_page():
     with st.form("forgot_form"):
         email = st.text_input("Email", key="forgot_email")
 
-        col1, col2 = st.columns(2)
+        col1, col2 = responsive_ui.get_responsive_columns(2, mobile_count=1)
         with col1:
             reset_submitted = st.form_submit_button("Send Reset Email", use_container_width=True)
         with col2:
@@ -862,7 +878,7 @@ def show_dashboard_page(user):
     """, unsafe_allow_html=True)
 
     st.markdown("### Key performance metrics")
-    metric_cols = st.columns(4, gap='large')
+    metric_cols = responsive_ui.get_responsive_columns(4, mobile_count=1, gap='large')
     metric_data = [
         ("Portfolio Alpha", "+12.8%", "Strong upside momentum"),
         ("AI Confidence", "89%", "High model certainty"),
@@ -879,7 +895,7 @@ def show_dashboard_page(user):
         """, unsafe_allow_html=True)
 
     st.markdown("### Market insights")
-    chart_col, summary_col = st.columns([2, 1], gap='large')
+    chart_col, summary_col = responsive_ui.get_responsive_columns(2, mobile_count=1, gap='large')
     with chart_col:
         if PLOTLY_AVAILABLE:
             fig = go.Figure()
@@ -931,7 +947,7 @@ def show_dashboard_page(user):
 
     st.markdown("### Recent activity")
     with st.container():
-        log_cols = st.columns(3, gap='large')
+        log_cols = responsive_ui.get_responsive_columns(3, mobile_count=1, gap='large')
         log_items = [
             ("Market Pulse", "Live market signal feed updated 2m ago."),
             ("AI Model", "LSTM forecast recalculated for 30-day horizon."),
@@ -1009,7 +1025,7 @@ def show_analysis_page():
         delta_pct = (latest.Close - stock_data['Close'].iloc[-2]) / stock_data['Close'].iloc[-2] if len(stock_data) > 1 else 0
         st.metric("Current Price", format_currency(latest.Close), delta=f"{delta_pct * 100:.2f}%")
 
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3 = responsive_ui.get_responsive_columns(3, mobile_count=1)
         with col1:
             st.metric("52W High", format_currency(stock_data['Close'].max()))
         with col2:
@@ -1088,13 +1104,13 @@ def show_analysis_page():
                 keyword_distribution = sentiment_analyzer.analyze_headline_keywords(news)
                 events = extract_event_signals(news)
 
-                sentiment_cols = st.columns(3)
+                sentiment_cols = responsive_ui.get_responsive_columns(3, mobile_count=1)
                 sentiment_cols[0].metric("Sentiment Tone", sentiment_summary['sentiment_label'])
                 sentiment_cols[1].metric("Confidence", f"{sentiment_summary['confidence'] * 100:.0f}%")
                 sentiment_cols[2].metric("Headline Count", len(news))
 
                 st.markdown("#### News Sentiment Breakdown")
-                breakdown_cols = st.columns(3)
+                breakdown_cols = responsive_ui.get_responsive_columns(3, mobile_count=1)
                 breakdown_cols[0].info(f"Positive keywords: {keyword_distribution.get('positive', 0):.0f}%")
                 breakdown_cols[1].info(f"Negative keywords: {keyword_distribution.get('negative', 0):.0f}%")
                 breakdown_cols[2].info(f"Neutral keywords: {keyword_distribution.get('neutral', 0):.0f}%")
@@ -1150,7 +1166,7 @@ def show_analysis_page():
         
         # Display recommendations for each period
         st.markdown("### 📈 Recommendations by Forecast Period")
-        rec_cols = st.columns(3)
+        rec_cols = responsive_ui.get_responsive_columns(3, mobile_count=1)
         
         for idx, days in enumerate(forecast_periods):
             if days in all_predictions and all_predictions[days] is not None and len(all_predictions[days]) > 0:
@@ -1303,7 +1319,7 @@ def show_analysis_page():
             st.markdown("### Risk Assessment & Confidence Metrics")
             
             # Risk Meter
-            risk_cols = st.columns(4)
+            risk_cols = responsive_ui.get_responsive_columns(4, mobile_count=1)
             
             # Volatility Score
             try:
@@ -1408,7 +1424,7 @@ def show_analysis_page():
         with tab2:
             st.markdown("### 🎯 Candlestick Patterns & Technical Analysis")
             
-            pattern_cols = st.columns(2)
+            pattern_cols = responsive_ui.get_responsive_columns(2, mobile_count=1)
             
             with pattern_cols[0]:
                 st.markdown("#### Pattern Recognition")
@@ -1553,7 +1569,7 @@ def show_analysis_page():
             # Portfolio Allocation (simulated)
             st.markdown("#### Portfolio Allocation Suggestion")
             
-            alloc_cols = st.columns(3)
+            alloc_cols = responsive_ui.get_responsive_columns(3, mobile_count=1)
 
             action = 'HOLD'
             confidence = 0
@@ -1644,7 +1660,7 @@ def show_analysis_page():
             # Advanced Insights
             st.markdown("#### AI-Powered Insights")
             
-            insights_cols = st.columns(2)
+            insights_cols = responsive_ui.get_responsive_columns(2, mobile_count=1)
             
             with insights_cols[0]:
                 st.markdown("**Market Sentiment Analysis**")
@@ -1721,7 +1737,7 @@ def show_analysis_page():
             # Prediction Accuracy Simulation
             st.markdown("#### Prediction Accuracy Metrics")
             
-            accuracy_cols = st.columns(3)
+            accuracy_cols = responsive_ui.get_responsive_columns(3, mobile_count=1)
             
             # Simulate accuracy metrics (in real app, this would be based on historical predictions)
             with accuracy_cols[0]:
@@ -1801,7 +1817,7 @@ def show_analysis_page():
 
         st.markdown("---")
         st.markdown("### Trade Workflow & Watchlist")
-        workflow_cols = st.columns(3)
+        workflow_cols = responsive_ui.get_responsive_columns(3, mobile_count=1)
         if 'watchlist' not in st.session_state:
             st.session_state.watchlist = []
 
@@ -1849,7 +1865,7 @@ def show_analysis_page():
             ("Risk Signal", safe_risk),
             ("Trend", safe_trend)
         ]
-        cols = st.columns(3)
+        cols = responsive_ui.get_responsive_columns(3, mobile_count=1)
         for idx, (label, value) in enumerate(metrics):
             with cols[idx]:
                 st.metric(label, value)
@@ -1882,7 +1898,7 @@ def show_alerts_page():
     </style>
     """, unsafe_allow_html=True)
 
-    metric_cols = st.columns(3)
+    metric_cols = responsive_ui.get_responsive_columns(3, mobile_count=1)
     metric_cols[0].metric("Active Alerts", len(user_alerts))
     metric_cols[1].metric("Triggered Alerts", triggered_count)
     metric_cols[2].metric("Total Alerts", len(user_alerts_all))
@@ -1895,7 +1911,7 @@ def show_alerts_page():
         
         if user_alerts:
             for alert in user_alerts:
-                col1, col2, col3 = st.columns([3, 1, 1])
+                col1, col2, col3 = responsive_ui.get_responsive_columns(3, mobile_count=1)
                 with col1:
                     triggered_badge = "🔴 TRIGGERED" if alert['triggered'] else "🟢 Active"
                     st.markdown(f"""
@@ -1915,7 +1931,7 @@ def show_alerts_page():
 
     with tab2:
         st.subheader("Create New Alert")
-        col1, col2 = st.columns(2)
+        col1, col2 = responsive_ui.get_responsive_columns(2, mobile_count=1)
         
         with col1:
             symbol = st.text_input("Stock Symbol", value="RELIANCE.NS", key="alert_symbol_new")
@@ -1932,7 +1948,7 @@ def show_alerts_page():
 
     with tab3:
         st.subheader("Alert Preferences")
-        col1, col2 = st.columns(2)
+        col1, col2 = responsive_ui.get_responsive_columns(2, mobile_count=1)
         
         with col1:
             st.checkbox("Email notifications on alert trigger", value=True, key="alert_email")
@@ -1970,14 +1986,14 @@ def show_portfolio_page():
             total_cost = sum(h['quantity'] * h['avg_buy_price'] for h in holdings)
             num_stocks = len(holdings)
             
-            col1, col2, col3, col4 = st.columns(4)
+            col1, col2, col3, col4 = responsive_ui.get_responsive_columns(4, mobile_count=1)
             col1.metric("Total Holdings", f"₹{total_cost:,.0f}")
             col2.metric("Stocks", num_stocks)
             col3.metric("Daily Change", "+1.82%", "+₹62,500")
             col4.metric("Annual Return", "+18.4%")
 
             risk_metrics = compute_portfolio_risk_metrics(holdings)
-            risk_cols = st.columns(4)
+            risk_cols = responsive_ui.get_responsive_columns(4, mobile_count=1)
             risk_cols[0].metric("Market Value", f"₹{risk_metrics['market_value']:,.0f}")
             risk_cols[1].metric("Unrealized P/L", f"₹{risk_metrics['unrealized_pnl']:,.0f}")
             risk_cols[2].metric("95% VaR", f"{risk_metrics['var_95']:.2f}%")
@@ -2004,7 +2020,7 @@ def show_portfolio_page():
 
             # Edit/Remove options
             selected_symbol = st.selectbox("Manage holding", [h['symbol'] for h in holdings], key="manage_holding")
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3 = responsive_ui.get_responsive_columns(3, mobile_count=1)
             
             with col1:
                 if st.button("Edit Holding", use_container_width=True, key="edit_holding_btn"):
@@ -2024,7 +2040,7 @@ def show_portfolio_page():
                 edited = next((h for h in holdings if h['symbol'] == selected_symbol), None)
                 if edited:
                     st.markdown("### Update Holding")
-                    edit_cols = st.columns(2)
+                    edit_cols = responsive_ui.get_responsive_columns(2, mobile_count=1)
                     with edit_cols[0]:
                         updated_quantity = st.number_input("Quantity", value=float(edited['quantity']), min_value=0.0, step=1.0, key="edit_quantity")
                         updated_notes = st.text_input("Notes", value=edited.get('notes', ''), key="edit_notes")
@@ -2043,7 +2059,7 @@ def show_portfolio_page():
 
     with tab2:
         st.subheader("Add New Holding")
-        col1, col2 = st.columns(2)
+        col1, col2 = responsive_ui.get_responsive_columns(2, mobile_count=1)
         
         with col1:
             symbol = st.text_input("Stock Symbol", value="RELIANCE.NS", key="portfolio_symbol")
@@ -2214,7 +2230,7 @@ def show_admin_dashboard():
 
     st.markdown("### System Health Overview")
     if system_health:
-        health_cols = st.columns(5)
+        health_cols = responsive_ui.get_responsive_columns(5, mobile_count=1)
         health_cols[0].metric("Active Users", system_health.get('active_users', 0))
         health_cols[1].metric("Active Alerts", system_health.get('active_alerts', 0))
         health_cols[2].metric("Activities (24h)", system_health.get('activities_24h', 0))
@@ -2273,7 +2289,7 @@ def show_admin_tools_page():
         if pending_users:
             st.dataframe(pd.DataFrame(pending_users).rename(columns={'created_at': 'Requested At'}), use_container_width=True)
             for user in pending_users:
-                cols = st.columns([2, 1, 1])
+                cols = responsive_ui.get_responsive_columns(3, mobile_count=1)
                 with cols[0]:
                     st.markdown(f"**{user['username']}** — {user['email']}")
                 with cols[1]:
@@ -2298,7 +2314,7 @@ def show_admin_tools_page():
         if feature_flags:
             for flag in feature_flags:
                 status = bool(flag['enabled'])
-                cols = st.columns([4, 1, 1])
+                cols = responsive_ui.get_responsive_columns(3, mobile_count=1)
                 with cols[0]:
                     st.markdown(f"**{flag['flag_name']}** — {flag['description']}")
                 with cols[1]:
@@ -2383,7 +2399,7 @@ def show_admin_ai_forecasting():
             key='admin_ai_confidence_threshold'
         )
 
-        cols = st.columns([2, 2, 2])
+        cols = responsive_ui.get_responsive_columns(3, mobile_count=1)
         with cols[0]:
             if st.button("Analyze Now", key='admin_ai_run'):
                 st.session_state.admin_ai_results = get_cached_admin_ai_results(
@@ -2425,7 +2441,7 @@ def show_admin_ai_forecasting():
             if 'error' in results:
                 st.error(results['error'])
             else:
-                cols = st.columns(4)
+                cols = responsive_ui.get_responsive_columns(4, mobile_count=1)
                 cols[0].metric("Current", f"₹{results.get('current_price', 0)}")
                 cols[1].metric("Ensemble", f"₹{results.get('ensemble', 0):.2f}")
                 cols[2].metric("AI Confidence", f"{results.get('confidence', 0):.1f}%")
@@ -2459,7 +2475,7 @@ def show_admin_ai_forecasting():
                 )
                 if model_summary:
                     st.markdown("#### Selected model impact")
-                    sm_cols = st.columns([2, 2, 2])
+                    sm_cols = responsive_ui.get_responsive_columns(3, mobile_count=1, gap='large')
                     sm_cols[0].metric("Model", model_summary.get('model', 'Unknown'))
                     sm_cols[1].metric("Prediction", f"₹{model_summary.get('prediction', 0)}")
                     sm_cols[2].metric("Confidence", f"{model_summary.get('confidence', 0)}%")
@@ -2494,7 +2510,7 @@ def show_user_management():
     users = db.get_all_users()
     stats = db.get_user_stats()
 
-    col1, col2, col3, col4, col5 = st.columns(5)
+    col1, col2, col3, col4, col5 = responsive_ui.get_responsive_columns(5, mobile_count=1)
     with col1:
         st.metric("Total Users", stats['total_users'])
     with col2:
@@ -2689,7 +2705,7 @@ def show_analytics():
     system_perf = metrics.get('system_perf', [])
 
     if system_health:
-        cols = st.columns(4)
+        cols = responsive_ui.get_responsive_columns(4, mobile_count=1)
         cols[0].metric("Active Users", system_health.get('active_users', 0))
         cols[1].metric("Active Alerts", system_health.get('active_alerts', 0))
         cols[2].metric("Activities (24h)", system_health.get('activities_24h', 0))

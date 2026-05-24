@@ -4,6 +4,7 @@ Ensures responsive design across all devices and platforms
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 from typing import Callable, Optional, Dict, Any
 
 # ============================================================================
@@ -399,15 +400,11 @@ class DynamicComponents:
 # MOBILE-OPTIMIZED LAYOUT HELPERS
 # ============================================================================
 
-def get_responsive_columns(count: int, mobile_count: int = 1) -> tuple:
-    """Get responsive column layout"""
-    width = st.session_state.get('viewport_width', 1024)
-    if width < 640:
-        return st.columns(mobile_count)
-    elif width < 1024:
-        return st.columns(max(2, mobile_count))
-    else:
-        return st.columns(count)
+def get_responsive_columns(count: int, mobile_count: int = 1, **kwargs) -> tuple:
+    """Get responsive column layout."""
+    # Use the configured column count consistently so calling code that unpacks
+    # multiple columns remains stable across screen sizes.
+    return st.columns(count, **kwargs)
 
 
 def render_mobile_navbar(nav_items: Dict[str, Callable]):
@@ -419,3 +416,30 @@ def render_mobile_navbar(nav_items: Dict[str, Callable]):
         with col:
             if st.button(label, use_container_width=True):
                 callback()
+
+
+def ensure_viewport_width(default_width: int = 1024):
+    """Detect viewport width in the browser and store it in session state."""
+    if 'viewport_width' in st.session_state:
+        return
+
+    query_params = st.experimental_get_query_params()
+    if 'vw' in query_params:
+        try:
+            st.session_state['viewport_width'] = int(float(query_params['vw'][0]))
+        except Exception:
+            st.session_state['viewport_width'] = default_width
+        return
+
+    # Use JavaScript to capture the viewport width on first load.
+    components.html(
+        """
+        <script>
+        const params = new URLSearchParams(window.location.search);
+        params.set('vw', window.innerWidth);
+        window.location.search = params.toString();
+        </script>
+        """,
+        height=0,
+    )
+    st.stop()
