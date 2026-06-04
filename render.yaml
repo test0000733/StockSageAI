@@ -1,0 +1,12 @@
+# Render manifest for StockSageAI
+services:
+  - type: web
+    name: stocksage-web
+    env: docker
+    plan: starter
+    branch: main
+    dockerfilePath: ./Dockerfile
+    startCommand: streamlit run StockSageAI/app.py --server.port $PORT --server.headless true
+    buildCommand: ""
+    disk: 512
+    region: oregon
