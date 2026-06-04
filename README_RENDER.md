@@ -29,4 +29,9 @@ Notes and tips
 - If your app uses GPU/large memory, choose appropriate Render plan and instance size.
 - If you want the app private behind authentication, configure Render's access controls or put it behind a simple auth proxy.
 
+Optional / heavy ML dependencies
+- The repository includes `requirements-optional.txt` which lists heavy packages (e.g. `tensorflow==2.12.0`).
+- If your deployment needs LSTM training or TensorFlow-based prediction, include that file during build (or merge into `requirements.txt`).
+- Note: adding TensorFlow will significantly increase image size and build time; choose Render plan with enough memory.
+
 If you want, I can: connect a ready GitHub Actions workflow to push images, or generate a small `render-ignore` list, or prepare an example `render.cron` or additional env var templates. Tell me which next step you'd like me to perform.
