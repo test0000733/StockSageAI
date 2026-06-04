@@ -25,7 +25,7 @@ COPY StockSageAI/ /app/StockSageAI/
 
 # Create .streamlit directory and copy config
 RUN mkdir -p /app/.streamlit
-COPY StockSageAI/.streamlit/config.toml /app/.streamlit/
+COPY .streamlit/config.toml /app/.streamlit/
 
 # Copy any data files (explicit list avoids shell fallback which is invalid in Dockerfile)
 # If you add more CSVs, include them here or copy the folder instead.
