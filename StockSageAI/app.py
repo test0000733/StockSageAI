@@ -1023,6 +1023,148 @@ def show_dashboard_page(user):
             </div>
         """, unsafe_allow_html=True)
 
+    # Quick Analyze widget on dashboard (compact analysis + exports)
+    st.markdown("### Quick Analyze")
+    with st.container():
+        qa_col, qa_col2 = responsive_ui.get_responsive_columns(2, mobile_count=1)
+        with qa_col:
+            quick_symbol = st.text_input("Quick analyze symbol", key="quick_analyze_stock", placeholder="RELIANCE.NS")
+        with qa_col2:
+            if st.button("Quick Analyze", key="quick_analyze_run"):
+                qs = (quick_symbol or "").strip().upper()
+                if not qs:
+                    st.error("Please enter a stock symbol to analyze.")
+                else:
+                    with st.spinner("Preparing quick report..."):
+                        try:
+                            df_quick = DataFetcher().get_stock_data(qs, period="1y")
+                        except Exception as e:
+                            st.error(f"Could not fetch data for {qs}: {e}")
+                            df_quick = None
+
+                        if df_quick is None or df_quick.empty:
+                            st.error(f"No time series data available for {qs}.")
+                        else:
+                            try:
+                                latest_q = df_quick.iloc[-1]
+                                current_price_q = latest_q.Close
+                            except Exception:
+                                current_price_q = df_quick['Close'].iloc[-1]
+
+                            # Generate lightweight forecasts using available predictor (best-effort)
+                            forecast_periods_q = [7, 14, 30]
+                            all_predictions_q = {}
+                            try:
+                                predictor_q = LSTMPredictor()
+                                for days in forecast_periods_q:
+                                    try:
+                                        preds = predictor_q.predict(df_quick, forecast_days=days)
+                                        if preds is not None and len(preds) > 0:
+                                            all_predictions_q[days] = preds
+                                    except Exception:
+                                        continue
+                            except Exception:
+                                all_predictions_q = {}
+
+                            # Prepare and offer Excel + PDF exports (reuse build_pdf_report)
+                            try:
+                                import io as _io
+                                import importlib as _importlib
+
+                                excel_engine = None
+                                if _importlib.util.find_spec('xlsxwriter') is not None:
+                                    excel_engine = 'xlsxwriter'
+                                elif _importlib.util.find_spec('openpyxl') is not None:
+                                    excel_engine = 'openpyxl'
+
+                                if excel_engine is None:
+                                    st.warning("Install xlsxwriter or openpyxl to enable Excel export.")
+                                else:
+                                    # Summary for Excel
+                                    summary_rows_q = [
+                                        ["Stock Symbol", qs],
+                                        ["Analysis Date", datetime.now().strftime("%Y-%m-%d %H:%M")],
+                                        ["Current Price", f"₹{current_price_q:.2f}"],
+                                        ["", ""]
+                                    ]
+                                    for days in forecast_periods_q:
+                                        if days in all_predictions_q and all_predictions_q[days]:
+                                            pred_price = all_predictions_q[days][-1]
+                                            change_pct = ((pred_price - current_price_q) / current_price_q) * 100
+                                            if change_pct > 3:
+                                                rec = "BUY"
+                                            elif change_pct < -3:
+                                                rec = "SELL"
+                                            else:
+                                                rec = "HOLD"
+                                            summary_rows_q.append([f"Forecast ({days}D) - Price", f"₹{pred_price:.2f}"])
+                                            summary_rows_q.append([f"Forecast ({days}D) - Change %", f"{change_pct:+.2f}%"])
+                                            summary_rows_q.append([f"Recommendation ({days}D)", rec])
+                                            summary_rows_q.append(["", ""])
+
+                                    excel_buffer_q = _io.BytesIO()
+                                    with pd.ExcelWriter(excel_buffer_q, engine=excel_engine) as writer_q:
+                                        summary_df_q = pd.DataFrame([[r[0], r[1]] for r in summary_rows_q], columns=["Metric", "Value"])
+                                        summary_df_q = clean_dataframe_for_export(summary_df_q, convert_index=False)
+                                        summary_df_q.to_excel(writer_q, index=False, sheet_name="Summary")
+
+                                        # Forecast details
+                                        forecast_rows_q = []
+                                        for days in forecast_periods_q:
+                                            if days in all_predictions_q and all_predictions_q[days]:
+                                                for i, price in enumerate(all_predictions_q[days]):
+                                                    forecast_rows_q.append({
+                                                        "Forecast Period (Days)": days,
+                                                        "Day": i + 1,
+                                                        "Predicted Price": price
+                                                    })
+
+                                        if forecast_rows_q:
+                                            forecast_df_q = pd.DataFrame(forecast_rows_q)
+                                            forecast_df_q = clean_dataframe_for_export(forecast_df_q, convert_index=False)
+                                            forecast_df_q.to_excel(writer_q, index=False, sheet_name="Forecasts")
+
+                                        # Historical data
+                                        if not df_quick.empty:
+                                            hist_df_q = df_quick[['Close', 'Volume']].reset_index()
+                                            if 'Date' not in hist_df_q.columns:
+                                                hist_df_q.rename(columns={hist_df_q.columns[0]: 'Date'}, inplace=True)
+                                            hist_df_q = clean_dataframe_for_export(hist_df_q, convert_index=False)
+                                            hist_df_q.to_excel(writer_q, index=False, sheet_name="Historical Data")
+
+                                    excel_buffer_q.seek(0)
+                                    st.download_button(
+                                        label=f"⬇️ Download Excel Report for {qs}",
+                                        data=excel_buffer_q,
+                                        file_name=f"{qs}_quick_analysis.xlsx",
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                        key=f"download_excel_quick_{qs}"
+                                    )
+
+                                # PDF export
+                                try:
+                                    pdf_buf_q = build_pdf_report(
+                                        stock_symbol=qs,
+                                        current_price=current_price_q,
+                                        forecast_periods=forecast_periods_q,
+                                        all_predictions=all_predictions_q,
+                                        stock_data=df_quick,
+                                    )
+                                    st.download_button(
+                                        label=f"⬇️ Download Branded PDF Report for {qs}",
+                                        data=pdf_buf_q,
+                                        file_name=f"{qs}_quick_analysis.pdf",
+                                        mime="application/pdf",
+                                        key=f"download_pdf_quick_{qs}"
+                                    )
+                                except ImportError:
+                                    st.warning("PDF export requires reportlab. Install with: pip install reportlab")
+                                except Exception as e:
+                                    logger.error(f"Quick PDF export failed: {e}")
+                                    st.error(f"PDF export failed: {e}")
+                            except Exception as e:
+                                st.error(f"Report generation failed: {e}")
+
     st.markdown("### Market insights")
     chart_col, summary_col = responsive_ui.get_responsive_columns(2, mobile_count=1, gap='large')
     with chart_col:
