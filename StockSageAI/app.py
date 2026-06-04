@@ -264,6 +264,135 @@ def render_export_loader(message='Preparing Financial Report...'):
 """, unsafe_allow_html=True)
 
 
+def build_pdf_report(stock_symbol, current_price, forecast_periods, all_predictions, stock_data):
+    try:
+        from reportlab.lib.pagesizes import letter
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    except ImportError as exc:
+        raise ImportError("ReportLab is required for PDF export. Install with: pip install reportlab") from exc
+
+    import io
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=inch / 2,
+        leftMargin=inch / 2,
+        topMargin=inch,
+        bottomMargin=inch,
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'ReportTitle',
+        parent=styles['Title'],
+        fontName='Helvetica-Bold',
+        fontSize=22,
+        textColor=colors.HexColor('#0f172a'),
+        spaceAfter=14,
+    )
+    heading_style = ParagraphStyle(
+        'Heading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=colors.HexColor('#1d4ed8'),
+        spaceAfter=10,
+    )
+    normal_style = ParagraphStyle(
+        'Normal',
+        parent=styles['BodyText'],
+        fontSize=10,
+        leading=14,
+        spaceAfter=8,
+    )
+
+    story = []
+    story.append(Paragraph('SP 07 StockSageAI — Full Analysis Report', title_style))
+    story.append(Paragraph('A detailed AI-enabled forecast report with model insights, recommendations, and branded analysis.', normal_style))
+    story.append(Spacer(1, 12))
+
+    summary_data = [
+        ['Report Item', 'Value'],
+        ['Stock Symbol', stock_symbol],
+        ['Report Generated', datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
+        ['Current Price', f'₹{current_price:.2f}'],
+        ['Analysis Platform', 'SP 07 StockSageAI'],
+    ]
+    summary_table = Table(summary_data, colWidths=[210, 220])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f8fafc')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#0f172a')),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+        ('GRID', (0, 0), (-1, -1), 0.25, colors.gray),
+    ]))
+    story.append(summary_table)
+    story.append(Spacer(1, 18))
+
+    story.append(Paragraph('Forecast Summary', heading_style))
+    forecast_rows = [['Forecast Horizon', 'Predicted Price', 'Change %', 'Recommendation']]
+    for days in forecast_periods:
+        if days in all_predictions and all_predictions[days] is not None and len(all_predictions[days]) > 0:
+            pred_price = all_predictions[days][-1]
+            change_pct = ((pred_price - current_price) / current_price) * 100
+            if change_pct > 3:
+                rec = 'BUY'
+            elif change_pct < -3:
+                rec = 'SELL'
+            else:
+                rec = 'HOLD'
+            forecast_rows.append([
+                f'{days} Days',
+                f'₹{pred_price:.2f}',
+                f'{change_pct:+.2f}%',
+                rec,
+            ])
+    if len(forecast_rows) > 1:
+        forecast_table = Table(forecast_rows, colWidths=[120, 120, 120, 120])
+        forecast_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e0f2fe')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('GRID', (0, 0), (-1, -1), 0.25, colors.gray),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        story.append(forecast_table)
+        story.append(Spacer(1, 14))
+
+    story.append(Paragraph('Historical Data Overview', heading_style))
+    if stock_data is not None and not stock_data.empty:
+        hist_sample = stock_data[['Close', 'Volume']].tail(5).reset_index()
+        hist_rows = [['Date', 'Close', 'Volume']]
+        for _, row in hist_sample.iterrows():
+            hist_rows.append([
+                str(row['Date']),
+                f'₹{row.get("Close", 0):.2f}',
+                f'{int(row.get("Volume", 0)):,}',
+            ])
+        hist_table = Table(hist_rows, colWidths=[140, 120, 180])
+        hist_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e5e7eb')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('GRID', (0, 0), (-1, -1), 0.25, colors.gray),
+        ]))
+        story.append(hist_table)
+        story.append(Spacer(1, 14))
+    else:
+        story.append(Paragraph('No historical data available for PDF export.', normal_style))
+        story.append(Spacer(1, 14))
+
+    story.append(Paragraph('Report Notes', heading_style))
+    story.append(Paragraph('This report was generated by the SP 07 StockSageAI platform. It includes AI forecasts, weighted recommendations, and recent historical data for the selected stock.', normal_style))
+    story.append(Spacer(1, 20))
+    story.append(Paragraph('Thank you for using SP 07 StockSageAI.', normal_style))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+
 def render_auth_loader(message='Secure Authentication in Progress...'):
     st.markdown(render_loader_styles(), unsafe_allow_html=True)
     st.markdown(f"""
@@ -356,7 +485,7 @@ def render_ai_processing_loader(message='AI Forecast Engine Running...'):
 
 def render_back_button(target_page='dashboard', label='← Back', key=None):
     key = key or f"back_{target_page}"
-    if st.button(label, key=key, use_container_width=True):
+    if st.button(label, key=key, width='stretch'):
         st.session_state.page = target_page
         st.rerun()
 
@@ -584,7 +713,7 @@ def show_login_page():
 
         col1, col2 = responsive_ui.get_responsive_columns(2, mobile_count=1)
         with col1:
-            login_submitted = st.form_submit_button("Login", use_container_width=True)
+            login_submitted = st.form_submit_button("Login", width='stretch')
         with col2:
             # Signup option removed — accounts are created by admins only
             st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True)
@@ -643,9 +772,9 @@ def show_signup_page():
 
         col1, col2 = responsive_ui.get_responsive_columns(2, mobile_count=1)
         with col1:
-            signup_submitted = st.form_submit_button("Sign Up", use_container_width=True)
+            signup_submitted = st.form_submit_button("Sign Up", width='stretch')
         with col2:
-            login_page = st.form_submit_button("Back to Login", use_container_width=True)
+            login_page = st.form_submit_button("Back to Login", width='stretch')
 
     if signup_submitted:
         success, message = auth_manager.signup(username, email, password, confirm_password)
@@ -676,9 +805,9 @@ def show_forgot_password_page():
 
         col1, col2 = responsive_ui.get_responsive_columns(2, mobile_count=1)
         with col1:
-            reset_submitted = st.form_submit_button("Send Reset Email", use_container_width=True)
+            reset_submitted = st.form_submit_button("Send Reset Email", width='stretch')
         with col2:
-            back = st.form_submit_button("Back to Login", use_container_width=True)
+            back = st.form_submit_button("Back to Login", width='stretch')
 
     if reset_submitted:
         if not email:
@@ -714,7 +843,7 @@ def show_pin_entry_page():
     # Use a single form for PIN entry to avoid per-button reruns
     with st.form("pin_form"):
         pin_input = st.text_input("Security PIN", type="password", max_chars=4, key="pin_entry_input", value=st.session_state.pin_entry)
-        pin_submit = st.form_submit_button("Authenticate PIN", use_container_width=True)
+        pin_submit = st.form_submit_button("Authenticate PIN", width='stretch')
 
     # Persist the input back to session state
     st.session_state.pin_entry = pin_input or st.session_state.pin_entry
@@ -767,8 +896,8 @@ def show_pin_reset_request_page():
 
     with st.form("pin_reset_request_form"):
         email = st.text_input("Email", key="pin_reset_email")
-        send_submitted = st.form_submit_button("Send PIN Reset Email", use_container_width=True)
-        back_to_login = st.form_submit_button("Back to Login", use_container_width=True)
+        send_submitted = st.form_submit_button("Send PIN Reset Email", width='stretch')
+        back_to_login = st.form_submit_button("Back to Login", width='stretch')
 
     if send_submitted:
         if not email:
@@ -808,7 +937,7 @@ def show_pin_reset_page():
     with st.form("pin_reset_form"):
         pin = st.text_input("New PIN", type="password", max_chars=4, key="pin_reset_pin")
         confirm_pin = st.text_input("Confirm New PIN", type="password", max_chars=4, key="pin_reset_confirm")
-        pin_reset_submitted = st.form_submit_button("Reset PIN", use_container_width=True)
+        pin_reset_submitted = st.form_submit_button("Reset PIN", width='stretch')
 
     if pin_reset_submitted:
         if not pin or not confirm_pin:
@@ -849,7 +978,7 @@ def show_reset_password_page():
         new_password = st.text_input("New Password", type="password", key="reset_password")
         confirm_password = st.text_input("Confirm Password", type="password", key="reset_confirm")
 
-        reset_submitted = st.form_submit_button("Reset Password", use_container_width=True)
+        reset_submitted = st.form_submit_button("Reset Password", width='stretch')
 
     if reset_submitted:
         success, message = auth_manager.reset_password(token, new_password, confirm_password)
@@ -925,7 +1054,7 @@ def show_dashboard_page(user):
             )
             fig.update_xaxes(showgrid=False)
             fig.update_yaxes(gridcolor='rgba(255,255,255,0.08)')
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         else:
             st.warning("Plotly charts are unavailable. Install plotly for premium dashboard visuals.")
 
@@ -978,7 +1107,7 @@ def show_analysis_page():
 
     if not stock_symbol:
         stock_symbol = st.text_input("Enter stock symbol to analyze", key="analysis_stock", placeholder="RELIANCE.NS")
-        if st.button("Run Forecast", use_container_width=True):
+        if st.button("Run Forecast", width='stretch'):
             if stock_symbol:
                 st.session_state.current_stock = stock_symbol.strip()
                 st.session_state.page = 'analysis'
@@ -1038,7 +1167,7 @@ def show_analysis_page():
         price_chart.add_trace(go.Scatter(x=stock_data.index, y=stock_data['MA_20'], mode='lines', line=dict(color='#9333ea', width=2, dash='dash'), name='MA 20'))
         price_chart.add_trace(go.Scatter(x=stock_data.index, y=stock_data['MA_50'], mode='lines', line=dict(color='#f97316', width=2, dash='dash'), name='MA 50'))
         price_chart.update_layout(template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=40, l=20, r=20, b=20), height=420)
-        st.plotly_chart(price_chart, use_container_width=True)
+        st.plotly_chart(price_chart, width='stretch')
 
         sentiment_scores = []
         news = []
@@ -1162,7 +1291,7 @@ def show_analysis_page():
             height=420,
             hovermode='x unified'
         )
-        st.plotly_chart(forecast_chart, use_container_width=True)
+        st.plotly_chart(forecast_chart, width='stretch')
         
         # Display recommendations for each period
         st.markdown("### 📈 Recommendations by Forecast Period")
@@ -1302,6 +1431,27 @@ def show_analysis_page():
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="download_excel_report"
             )
+
+            try:
+                pdf_buffer = build_pdf_report(
+                    stock_symbol=stock_symbol,
+                    current_price=current_price,
+                    forecast_periods=forecast_periods,
+                    all_predictions=all_predictions,
+                    stock_data=stock_data,
+                )
+                st.download_button(
+                    label="⬇️ Download Branded PDF Report",
+                    data=pdf_buffer,
+                    file_name=f"{stock_symbol}_analysis_report.pdf",
+                    mime="application/pdf",
+                    key="download_pdf_report"
+                )
+            except ImportError:
+                st.warning("⚠️ PDF export requires reportlab. Install with: `pip install reportlab`")
+            except Exception as e:
+                logger.error(f"PDF export failed: {e}")
+                st.error(f"⚠️ PDF export failed: {str(e)}")
         except ImportError:
             st.warning("⚠️ Excel export requires xlsxwriter or openpyxl. Install with: `pip install xlsxwriter openpyxl`")
         except Exception as e:
@@ -1486,7 +1636,7 @@ def show_analysis_page():
                 hovermode='x unified'
             )
             
-            st.plotly_chart(tech_chart, use_container_width=True)
+            st.plotly_chart(tech_chart, width='stretch')
         
         with tab3:
             st.markdown("### 📈 Portfolio Analytics & Heatmaps")
@@ -1548,7 +1698,7 @@ def show_analysis_page():
                     yaxis=dict(tickfont=dict(size=10))
                 )
                 
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
                 
                 # Sector comparison table
                 st.markdown("#### Sector Comparison")
@@ -1561,7 +1711,7 @@ def show_analysis_page():
                         return ['background-color: rgba(34, 211, 238, 0.2)'] * len(row)
                     return [''] * len(row)
                 
-                st.dataframe(sector_table.style.apply(highlight_sector, axis=1), use_container_width=True)
+                st.dataframe(sector_table.style.apply(highlight_sector, axis=1), width='stretch')
             
             except Exception as e:
                 st.warning(f"Could not generate sector analysis: {str(e)}")
@@ -1655,7 +1805,7 @@ def show_analysis_page():
                         yaxis=dict(range=[0, 100], title='Confidence %')
                     )
                     
-                    st.plotly_chart(conf_chart, use_container_width=True)
+                    st.plotly_chart(conf_chart, width='stretch')
             
             # Advanced Insights
             st.markdown("#### AI-Powered Insights")
@@ -1870,7 +2020,7 @@ def show_analysis_page():
             with cols[idx]:
                 st.metric(label, value)
 
-        if st.button("Back to Home", use_container_width=True):
+        if st.button("Back to Home", width='stretch'):
             st.session_state.page = 'dashboard'
             st.rerun()
 
@@ -1919,10 +2069,10 @@ def show_alerts_page():
                     *Created: {alert['created_at'][:10]}*
                     """)
                 with col2:
-                    if st.button("Edit", key=f"edit_alert_{alert['id']}", use_container_width=True):
+                    if st.button("Edit", key=f"edit_alert_{alert['id']}", width='stretch'):
                         st.session_state.edit_alert = alert['id']
                 with col3:
-                    if st.button("❌", key=f"delete_alert_{alert['id']}", use_container_width=True):
+                    if st.button("❌", key=f"delete_alert_{alert['id']}", width='stretch'):
                         db.deactivate_alert(alert['id'])
                         st.success(f"Alert deleted for {alert['symbol']}")
                         st.rerun()
@@ -1939,7 +2089,7 @@ def show_alerts_page():
         
         with col2:
             threshold = st.number_input("Threshold Value", value=2600.0, step=0.01, key="alert_threshold_new")
-            if st.button("Create Alert", use_container_width=True, key="create_alert_btn"):
+            if st.button("Create Alert", width='stretch', key="create_alert_btn"):
                 alert_id = db.create_alert(user['id'], symbol.upper(), alert_type, threshold)
                 if alert_id:
                     db.log_activity(user['id'], 'create_alert', f'Created {alert_type} alert for {symbol}')
@@ -1958,7 +2108,7 @@ def show_alerts_page():
             st.selectbox("Check frequency", ["Real-time", "Every 15 min", "Every 30 min", "Daily"], key="alert_frequency")
             st.selectbox("Silence after trigger", ["Never", "5 min", "30 min", "1 hour"], key="alert_silence")
 
-        if st.button("Save Preferences", use_container_width=True, key="save_alert_prefs"):
+        if st.button("Save Preferences", width='stretch', key="save_alert_prefs"):
             st.success("Alert preferences saved!")
 
 
@@ -2005,7 +2155,7 @@ def show_portfolio_page():
             df_display.columns = ['Symbol', 'Quantity', 'Avg Buy Price', 'Entry Date']
             df_display['Total Value'] = df_holdings['quantity'] * df_holdings['avg_buy_price']
             
-            st.dataframe(df_display, use_container_width=True)
+            st.dataframe(df_display, width='stretch')
 
             if risk_metrics and risk_metrics.get('allocations'):
                 exposure_df = pd.DataFrame(risk_metrics['allocations'])
@@ -2016,24 +2166,24 @@ def show_portfolio_page():
                     'allocation_pct': 'Allocation %'
                 })
                 st.markdown("#### Portfolio Exposure")
-                st.dataframe(exposure_df, use_container_width=True)
+                st.dataframe(exposure_df, width='stretch')
 
             # Edit/Remove options
             selected_symbol = st.selectbox("Manage holding", [h['symbol'] for h in holdings], key="manage_holding")
             col1, col2, col3 = responsive_ui.get_responsive_columns(3, mobile_count=1)
             
             with col1:
-                if st.button("Edit Holding", use_container_width=True, key="edit_holding_btn"):
+                if st.button("Edit Holding", width='stretch', key="edit_holding_btn"):
                     st.session_state.edit_holding = selected_symbol
             with col2:
-                if st.button("Remove Holding", use_container_width=True, key="remove_holding"):
+                if st.button("Remove Holding", width='stretch', key="remove_holding"):
                     db.remove_portfolio_holding(user['id'], selected_symbol)
                     db.record_portfolio_history(user['id'], total_cost, 0.0, 0.0, 0.0)
                     db.log_activity(user['id'], 'remove_portfolio_holding', f'Removed {selected_symbol}')
                     st.success(f"Removed {selected_symbol} from portfolio")
                     st.rerun()
             with col3:
-                if st.button("View Chart", use_container_width=True, key="view_holding_chart"):
+                if st.button("View Chart", width='stretch', key="view_holding_chart"):
                     st.session_state.current_stock = selected_symbol
 
             if st.session_state.get('edit_holding') == selected_symbol:
@@ -2046,7 +2196,7 @@ def show_portfolio_page():
                         updated_notes = st.text_input("Notes", value=edited.get('notes', ''), key="edit_notes")
                     with edit_cols[1]:
                         updated_price = st.number_input("Average Buy Price", value=float(edited['avg_buy_price']), min_value=0.0, step=0.01, key="edit_price")
-                        if st.button("Save Changes", use_container_width=True, key="save_holding_changes"):
+                        if st.button("Save Changes", width='stretch', key="save_holding_changes"):
                             db.update_portfolio_holding(user['id'], selected_symbol, updated_quantity, updated_price, updated_notes)
                             db.record_portfolio_history(user['id'], total_cost, 0.0, 0.0, 0.0)
                             db.log_activity(user['id'], 'update_portfolio_holding', f'Updated {selected_symbol} to {updated_quantity} @ {updated_price}')
@@ -2069,7 +2219,7 @@ def show_portfolio_page():
             avg_price = st.number_input("Average Buy Price", value=2500.0, step=0.01, key="portfolio_price")
             notes = st.text_input("Notes (optional)", key="portfolio_notes")
 
-        if st.button("Add to Portfolio", use_container_width=True, key="add_to_portfolio_btn"):
+        if st.button("Add to Portfolio", width='stretch', key="add_to_portfolio_btn"):
             db.add_portfolio_holding(user['id'], symbol.upper(), quantity, avg_price, notes)
             db.record_portfolio_history(user['id'], quantity * avg_price, 0.0, 0.0, 0.0)
             db.log_activity(user['id'], 'add_portfolio_holding', f'Added {quantity} x {symbol}')
@@ -2101,7 +2251,7 @@ def show_portfolio_page():
                 template="plotly_dark",
                 hovermode='x unified'
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         else:
             st.info("No performance history yet. Track your portfolio over time!")
 
@@ -2144,7 +2294,7 @@ def show_main_app():
     if 'theme' not in st.session_state:
         st.session_state.theme = 'dark'
 
-    if st.button("🌓 Toggle Theme", use_container_width=True, key="theme_toggle_btn"):
+    if st.button("🌓 Toggle Theme", width='stretch', key="theme_toggle_btn"):
         st.session_state.theme = 'light' if st.session_state.theme == 'dark' else 'dark'
         st.rerun()
 
@@ -2240,7 +2390,7 @@ def show_admin_dashboard():
         st.info("No system health metrics available yet.")
 
     st.markdown("---")
-    if st.button("Open Admin Tools", key='open_admin_tools', use_container_width=True):
+    if st.button("Open Admin Tools", key='open_admin_tools', width='stretch'):
         st.session_state.page = 'admin_tools'
         st.rerun()
 
@@ -2287,7 +2437,7 @@ def show_admin_tools_page():
         pending_users = db.get_pending_users()
 
         if pending_users:
-            st.dataframe(pd.DataFrame(pending_users).rename(columns={'created_at': 'Requested At'}), use_container_width=True)
+            st.dataframe(pd.DataFrame(pending_users).rename(columns={'created_at': 'Requested At'}), width='stretch')
             for user in pending_users:
                 cols = responsive_ui.get_responsive_columns(3, mobile_count=1)
                 with cols[0]:
@@ -2378,13 +2528,16 @@ def show_admin_ai_forecasting():
         )
         
         available_models = get_visible_model_names()  # 5 visible models
-        admin_ai_model = st.session_state.get('admin_ai_model', available_models[0])
+        if not available_models:
+            available_models = ['Transformer LSTM']
+
+        admin_ai_model = st.session_state.get('admin_ai_model') or available_models[0]
         if admin_ai_model not in available_models:
             st.session_state.admin_ai_model = available_models[0]
             admin_ai_model = available_models[0]
 
         # Ensure the session state key exists before creating the widget
-        if 'admin_ai_selected_models' not in st.session_state:
+        if 'admin_ai_selected_models' not in st.session_state or not st.session_state.get('admin_ai_selected_models'):
             st.session_state['admin_ai_selected_models'] = [admin_ai_model]
 
         selected_models = st.multiselect(
@@ -2534,7 +2687,7 @@ def show_user_management():
             'is_banned': 'Banned',
             'subscription_type': 'Subscription'
         })
-        st.dataframe(df_display.reset_index(drop=True), use_container_width=True)
+        st.dataframe(df_display.reset_index(drop=True), width='stretch')
 
         user_map = {user['id']: user for user in users}
         selection = st.selectbox(
@@ -2721,7 +2874,7 @@ def show_analytics():
     if api_usage:
         st.markdown("### API Usage")
         df_api = pd.DataFrame(api_usage)
-        st.dataframe(df_api, use_container_width=True)
+        st.dataframe(df_api, width='stretch')
         if not df_api.empty and 'request_count' in df_api.columns:
             st.line_chart(df_api.set_index('last_used')['request_count'])
     else:
@@ -2731,9 +2884,9 @@ def show_analytics():
         st.markdown("### Recent System Performance Metrics")
         df_perf = pd.DataFrame(system_perf)
         if 'metric_data' in df_perf.columns:
-            st.dataframe(df_perf[['recorded_at', 'metric_name', 'metric_value', 'metric_data']].head(20), use_container_width=True)
+            st.dataframe(df_perf[['recorded_at', 'metric_name', 'metric_value', 'metric_data']].head(20), width='stretch')
         else:
-            st.dataframe(df_perf.head(20), use_container_width=True)
+            st.dataframe(df_perf.head(20), width='stretch')
 
         if not df_perf.empty and 'metric_value' in df_perf.columns:
             perf_chart = df_perf.copy()
@@ -2805,7 +2958,7 @@ def show_security_settings():
                 'id': 'User ID', 'username': 'Username', 'email': 'Email', 'role': 'Role',
                 'two_factor_enabled': '2FA Enabled', 'last_login': 'Last Login'
             })
-            st.dataframe(display_df, use_container_width=True)
+            st.dataframe(display_df, width='stretch')
 
             st.write("Select a user below to manage their 2FA settings:")
             for user in users:
@@ -2848,23 +3001,23 @@ def show_security_settings():
 def add_sidebar_navigation():
     with st.sidebar:
         st.title("Navigation")
-        if st.button("📊 Dashboard", use_container_width=True):
+        if st.button("📊 Dashboard", width='stretch'):
             st.session_state.page = 'dashboard'
             st.rerun()
 
-        if st.button("📈 Analysis", use_container_width=True):
+        if st.button("📈 Analysis", width='stretch'):
             st.session_state.page = 'analysis'
             st.rerun()
 
-        if st.button("🚨 Alerts", use_container_width=True):
+        if st.button("🚨 Alerts", width='stretch'):
             st.session_state.page = 'alerts'
             st.rerun()
 
-        if st.button("💼 Portfolio", use_container_width=True):
+        if st.button("💼 Portfolio", width='stretch'):
             st.session_state.page = 'portfolio'
             st.rerun()
 
-        if st.button("⚙️ Settings", use_container_width=True):
+        if st.button("⚙️ Settings", width='stretch'):
             st.session_state.page = 'settings'
             st.rerun()
 
@@ -2893,17 +3046,17 @@ def add_sidebar_navigation():
                 <span class='pending-badge'>{pending_count} pending</span>
                 """, unsafe_allow_html=True)
             
-            if st.button("🛡️ Admin Dashboard", use_container_width=True):
+            if st.button("🛡️ Admin Dashboard", width='stretch'):
                 st.session_state.page = 'admin'
                 st.rerun()
             
             admin_tools_label = f"🧠 Admin Tools{'   🔴' if pending_count > 0 else ''}"
-            if st.button(admin_tools_label, use_container_width=True):
+            if st.button(admin_tools_label, width='stretch'):
                 st.session_state.page = 'admin_tools'
                 st.rerun()
 
         st.divider()
-        if st.button("🚪 Logout", use_container_width=True):
+        if st.button("🚪 Logout", width='stretch'):
             auth_manager.logout()
 
 # --- Main App Logic ---

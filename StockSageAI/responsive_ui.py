@@ -391,7 +391,7 @@ class DynamicComponents:
         cols = st.columns(len(buttons))
         for col, (label, callback) in zip(cols, buttons.items()):
             with col:
-                if st.button(label, use_container_width=True, key=f"btn_{label}"):
+                if st.button(label, width='stretch', key=f"btn_{label}"):
                     callback()
 
 
@@ -413,7 +413,7 @@ def render_mobile_navbar(nav_items: Dict[str, Callable]):
     cols = st.columns(len(nav_items))
     for col, (label, callback) in zip(cols, nav_items.items()):
         with col:
-            if st.button(label, use_container_width=True):
+            if st.button(label, width='stretch'):
                 callback()
 
 
