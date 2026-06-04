@@ -29,6 +29,11 @@ Notes and tips
 - If your app uses GPU/large memory, choose appropriate Render plan and instance size.
 - If you want the app private behind authentication, configure Render's access controls or put it behind a simple auth proxy.
 
+Important Render service note
+- The app must be deployed as a Docker web service, not a static site.
+- If your existing Render service was created as a static site, delete it and create a new Web Service with `Docker` selected.
+- Use `Dockerfile` as the build method and the start command below.
+
 Optional / heavy ML dependencies
 - The repository includes `requirements-optional.txt` which lists heavy packages (e.g. `tensorflow==2.12.0`).
 - If your deployment needs LSTM training or TensorFlow-based prediction, include that file during build (or merge into `requirements.txt`).
