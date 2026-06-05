@@ -2678,9 +2678,13 @@ def show_admin_ai_forecasting():
             st.session_state.admin_ai_model = available_models[0]
             admin_ai_model = available_models[0]
 
-        # Ensure the session state key exists before creating the widget
+        # Ensure the session state key exists before creating the widgets
         if 'admin_ai_selected_models' not in st.session_state or not st.session_state.get('admin_ai_selected_models'):
             st.session_state['admin_ai_selected_models'] = [admin_ai_model]
+
+        # Defensive initialization for confidence threshold (avoid None values from previous sessions)
+        if 'admin_ai_confidence_threshold' not in st.session_state or not isinstance(st.session_state.get('admin_ai_confidence_threshold'), (int, float)):
+            st.session_state['admin_ai_confidence_threshold'] = 40
 
         selected_models = st.multiselect(
             "Select AI models to run (5 models + 3 background ensemble)",
@@ -2693,7 +2697,7 @@ def show_admin_ai_forecasting():
             "Minimum confidence threshold",
             min_value=0,
             max_value=100,
-            value=40,
+            value=int(st.session_state.get('admin_ai_confidence_threshold', 40)),
             step=5,
             key='admin_ai_confidence_threshold'
         )
@@ -2701,11 +2705,15 @@ def show_admin_ai_forecasting():
         cols = responsive_ui.get_responsive_columns(3, mobile_count=1)
         with cols[0]:
             if st.button("Analyze Now", key='admin_ai_run'):
-                st.session_state.admin_ai_results = get_cached_admin_ai_results(
-                    admin_ai_stock,
-                    tuple(selected_models),
-                    st.session_state.get('admin_ai_refresh_counter', 0)
-                )
+                if not selected_models:
+                    st.warning("Please select at least one AI model to run.")
+                    st.session_state.admin_ai_results = {'error': 'No models selected', 'results': []}
+                else:
+                    st.session_state.admin_ai_results = get_cached_admin_ai_results(
+                        admin_ai_stock,
+                        tuple(selected_models),
+                        st.session_state.get('admin_ai_refresh_counter', 0)
+                    )
                 st.session_state.admin_ai_auto_run = False
         with cols[1]:
             if st.button("Run Ensemble", key='admin_ai_run_ensemble'):
