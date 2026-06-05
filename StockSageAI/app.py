@@ -2743,71 +2743,78 @@ def show_admin_ai_forecasting():
         # do not reassign it after the widget is created (Streamlit disallows this).
 
         admin_ai_results = st.session_state.get('admin_ai_results')
-        if admin_ai_results:
+        if admin_ai_results is not None:
             results = admin_ai_results
-            if 'error' in results:
-                st.error(results['error'])
-            else:
-                cols = responsive_ui.get_responsive_columns(4, mobile_count=1)
-                cols[0].metric("Current", f"₹{results.get('current_price', 0)}")
-                cols[1].metric("Ensemble", f"₹{results.get('ensemble', 0):.2f}")
-                cols[2].metric("AI Confidence", f"{results.get('confidence', 0):.1f}%")
-                cols[3].metric("Models run", len(results.get('results', [])))
+            if isinstance(results, dict) and 'error' in results:
+                st.error(f"❌ Analysis error: {results['error']}")
+            elif isinstance(results, dict) and results:
+                # Display results safely
+                try:
+                    cols = responsive_ui.get_responsive_columns(4, mobile_count=1)
+                    cols[0].metric("Current", f"₹{results.get('current_price', 0)}")
+                    cols[1].metric("Ensemble", f"₹{results.get('ensemble', 0):.2f}")
+                    cols[2].metric("AI Confidence", f"{results.get('confidence', 0):.1f}%")
+                    cols[3].metric("Models run", len(results.get('results', [])))
 
-                st.markdown(f"**Regime outlook:** {results.get('regime', 'Mixed')}")
-                st.markdown(f"**Regime confidence:** {results.get('regime_confidence', 0.0)}%")
-                st.markdown(f"**Anomaly score:** {results.get('anomaly_score', 0.0)}%")
+                    st.markdown(f"**Regime outlook:** {results.get('regime', 'Mixed')}")
+                    st.markdown(f"**Regime confidence:** {results.get('regime_confidence', 0.0)}%")
+                    st.markdown(f"**Anomaly score:** {results.get('anomaly_score', 0.0)}%")
 
-                weights = results.get('recommended_weights', {})
-                if weights:
-                    with st.expander("Recommended model weight allocation"):
-                        for model_name, weight in weights.items():
-                            st.write(f"- {model_name}: {int(weight * 100)}%")
+                    weights = results.get('recommended_weights', {})
+                    if weights:
+                        with st.expander("Recommended model weight allocation"):
+                            for model_name, weight in weights.items():
+                                st.write(f"- {model_name}: {int(weight * 100)}%")
 
-                state_probs = results.get('state_probabilities', {})
-                if state_probs:
-                    with st.expander("Regime probability distribution"):
-                        for regime_name, prob in state_probs.items():
-                            st.write(f"- {regime_name}: {prob}%")
+                    state_probs = results.get('state_probabilities', {})
+                    if state_probs:
+                        with st.expander("Regime probability distribution"):
+                            for regime_name, prob in state_probs.items():
+                                st.write(f"- {regime_name}: {prob}%")
 
-                history = results.get('regime_history', [])
-                if history:
-                    with st.expander("Recent regime history"):
-                        for item in history[-10:]:
-                            st.write(f"{item.get('date', '')} — {item.get('regime', '')} ({item.get('confidence', 0)}%)")
+                    history = results.get('regime_history', [])
+                    if history:
+                        with st.expander("Recent regime history"):
+                            for item in history[-10:]:
+                                st.write(f"{item.get('date', '')} — {item.get('regime', '')} ({item.get('confidence', 0)}%)")
 
-                model_summary = next(
-                    (item for item in results.get('results', []) if item['model'] == admin_ai_model),
-                    results.get('results', [None])[0]
-                )
-                if model_summary:
-                    st.markdown("#### Selected model impact")
-                    sm_cols = responsive_ui.get_responsive_columns(3, mobile_count=1, gap='large')
-                    sm_cols[0].metric("Model", model_summary.get('model', 'Unknown'))
-                    sm_cols[1].metric("Prediction", f"₹{model_summary.get('prediction', 0)}")
-                    sm_cols[2].metric("Confidence", f"{model_summary.get('confidence', 0)}%")
-                    st.markdown(f"**Model regime:** {model_summary.get('regime', 'Unknown')}")
-                    st.markdown(f"**Model reasoning:** {model_summary.get('reasoning', '')}")
+                    model_summary = next(
+                        (item for item in results.get('results', []) if item['model'] == admin_ai_model),
+                        results.get('results', [None])[0]
+                    )
+                    if model_summary:
+                        st.markdown("#### Selected model impact")
+                        sm_cols = responsive_ui.get_responsive_columns(3, mobile_count=1, gap='large')
+                        sm_cols[0].metric("Model", model_summary.get('model', 'Unknown'))
+                        sm_cols[1].metric("Prediction", f"₹{model_summary.get('prediction', 0)}")
+                        sm_cols[2].metric("Confidence", f"{model_summary.get('confidence', 0)}%")
+                        st.markdown(f"**Model regime:** {model_summary.get('regime', 'Unknown')}")
+                        st.markdown(f"**Model reasoning:** {model_summary.get('reasoning', '')}")
+                        st.markdown("---")
+
                     st.markdown("---")
+                    for model_result in results.get('results', []):
+                        with st.expander(f"{model_result.get('model', 'Model')} — ₹{model_result.get('prediction', 0)} ({model_result.get('confidence', 0)}%)"):
+                            st.markdown(f"**Regime:** {model_result.get('regime', 'Unknown')}")
+                            st.markdown(f"**Summary:** {model_result.get('summary', '')}")
+                            st.markdown(f"**Reasoning:** {model_result.get('reasoning', '')}")
 
-                st.markdown("---")
-                for model_result in results.get('results', []):
-                    with st.expander(f"{model_result.get('model', 'Model')} — ₹{model_result.get('prediction', 0)} ({model_result.get('confidence', 0)}%)"):
-                        st.markdown(f"**Regime:** {model_result.get('regime', 'Unknown')}")
-                        st.markdown(f"**Summary:** {model_result.get('summary', '')}")
-                        st.markdown(f"**Reasoning:** {model_result.get('reasoning', '')}")
-
-                st.markdown("---")
-                st.markdown("#### Forecast architecture notes")
-                st.write("This admin-only engine is built as a modular hybrid forecast system with placeholder Transformer, GNN, and sequence model components. It is designed to evolve into a full next-gen AI forecasting architecture.")
+                    st.markdown("---")
+                    st.markdown("#### Forecast architecture notes")
+                    st.write("This admin-only engine is built as a modular hybrid forecast system with placeholder Transformer, GNN, and sequence model components. It is designed to evolve into a full next-gen AI forecasting architecture.")
+                except Exception as e:
+                    st.error(f"❌ Failed to display results: {str(e)}")
+                    logger.error(f"Admin AI results display error: {e}", exc_info=True)
+            else:
+                st.warning("⚠️ No results available. The analysis may have failed or returned empty data.")
         elif admin_ai_stock:
-            st.info("Click 'Analyze Now' or 'Run Ensemble' to execute the selected admin AI models.")
+            st.info("⏳ Click 'Analyze Now' or 'Run Ensemble' to execute analysis on selected AI models.")
         else:
-            st.info("Search a stock name above to auto-select it and start the admin AI analysis.")
+            st.info("🔍 Search a stock symbol above to start the admin AI analysis.")
     elif st.session_state.get('admin_ai_stock', ''):
-        st.info("Click 'Analyze Now' to run the selected admin AI model and return a consensus forecast.")
+        st.info("⏳ Click 'Analyze Now' to run the selected admin AI model and return a consensus forecast.")
     else:
-        st.info("Search a stock name above to auto-select it and start the admin AI analysis.")
+        st.info("🔍 Search a stock symbol above to start the admin AI analysis.")
 
 
 def show_user_management():
