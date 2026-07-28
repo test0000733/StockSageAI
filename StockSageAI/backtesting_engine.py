@@ -21,11 +21,27 @@ class BacktestingEngine:
         self.initial_capital = initial_capital
         self.results = None
     
+    def _download_data(self, symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
+        try:
+            df = yf.download(symbol, start=start_date, end=end_date, progress_bar=False, quiet=True)
+            if df.empty or 'Close' not in df.columns:
+                ticker = yf.Ticker(symbol)
+                df = ticker.history(start=start_date, end=end_date, interval='1d', actions=False)
+            return df
+        except Exception as e:
+            logger.error(f"Error downloading data for {symbol}: {e}")
+            return pd.DataFrame()
+
     def fetch_historical_data(self, symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
         """Fetch historical OHLCV data"""
         try:
-            df = yf.download(symbol, start=start_date, end=end_date, progress_bar=False, quiet=True)
-            df['Daily_Return'] = df['Close'].pct_change()
+            df = self._download_data(symbol, start_date, end_date)
+            if df.empty and start_date == end_date:
+                # Try a one-day extension when same-day range was provided
+                end_date = (pd.to_datetime(end_date) + timedelta(days=1)).strftime('%Y-%m-%d')
+                df = self._download_data(symbol, start_date, end_date)
+            if not df.empty and 'Close' in df.columns:
+                df['Daily_Return'] = df['Close'].pct_change()
             return df
         except Exception as e:
             logger.error(f"Error fetching data for {symbol}: {e}")

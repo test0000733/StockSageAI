@@ -3013,12 +3013,17 @@ def get_cached_admin_ai_results(symbol, model_tuple, refresh_counter=0):
             return combined
 
         # Fill in standard fields for trained model results
-        results['current_price'] = float(df['Close'].iloc[-1]) if 'Close' in df.columns else 0.0
-        results['symbol'] = symbol
-        if 'regime' not in results:
-            results['regime'] = 'Adaptive Mixed Market'
-        if 'results' not in results:
-            results['results'] = []
+        if isinstance(results, dict):
+            if results.get('error') is None:
+                results.pop('error', None)
+            results['ensemble'] = float(results.get('ensemble', results.get('ensemble_prediction', 0)))
+            results['confidence'] = float(results.get('confidence', results.get('ensemble_confidence', 0)))
+            results['current_price'] = float(df['Close'].iloc[-1]) if 'Close' in df.columns else results.get('current_price', 0.0)
+            results['symbol'] = symbol
+            if 'regime' not in results:
+                results['regime'] = 'Adaptive Mixed Market'
+            if 'results' not in results:
+                results['results'] = []
 
         return results
 

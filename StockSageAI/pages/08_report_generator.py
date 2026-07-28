@@ -247,21 +247,14 @@ with tab2:
             try:
                 symbol_list = [s.strip().upper() for s in symbols_sched.split(",")]
                 
-                if schedule_type == "daily":
-                    result = generator.schedule_daily_training(
-                        report_type=report_type_sched,
-                        symbols=symbol_list,
-                        time=time.strftime("%H:%M"),
-                        timezone=timezone
-                    )
-                else:
-                    result = generator.schedule_weekly_training(
-                        report_type=report_type_sched,
-                        symbols=symbol_list,
-                        day=day,
-                        time=time.strftime("%H:%M"),
-                        timezone=timezone
-                    )
+                result = generator.schedule_report_generation(
+                    user_id='demo_user',
+                    frequency=report_type_sched,
+                    time=time.strftime("%H:%M"),
+                    day=day if schedule_type == 'weekly' else None,
+                    timezone=timezone,
+                    email=email if enable_email else None
+                )
                 
                 if result:
                     st.success(f"✅ Report scheduled for {schedule_type} at {time}")

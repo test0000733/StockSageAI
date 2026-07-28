@@ -3,7 +3,11 @@ Scheduled Automated Training for SP 07 StockSageAI
 Automatic model retraining with drift detection and versioning
 """
 
-import schedule
+try:
+    import schedule
+except ImportError:
+    schedule = None
+
 import threading
 import logging
 from datetime import datetime, timedelta
@@ -45,13 +49,15 @@ class TrainingScheduler:
         }
         
         self.jobs[job['id']] = job
-        
-        # Schedule with APScheduler or schedule library
-        schedule.every().day.at(time).do(
-            self._run_training_job,
-            models=models,
-            job_id=job['id']
-        )
+
+        if schedule is not None:
+            schedule.every().day.at(time).do(
+                self._run_training_job,
+                models=models,
+                job_id=job['id']
+            )
+        else:
+            logger.warning("`schedule` package not installed. Daily training will be recorded but not automatically scheduled.")
         
         logger.info(f"Scheduled daily training for {models} at {time}")
         
@@ -85,12 +91,14 @@ class TrainingScheduler:
             'sunday': schedule.every().sunday
         }
         
-        if day.lower() in day_map:
+        if schedule is not None and day.lower() in day_map:
             day_map[day.lower()].at(time).do(
                 self._run_training_job,
                 models=models,
                 job_id=job['id']
             )
+        elif schedule is None:
+            logger.warning("`schedule` package not installed. Weekly training will be recorded but not automatically scheduled.")
         
         logger.info(f"Scheduled {day} weekly training for {models} at {time}")
         
@@ -112,13 +120,15 @@ class TrainingScheduler:
         
         self.jobs[job['id']] = job
         
-        # Check for drift daily
-        schedule.every().day.do(
-            self._check_model_drift,
-            job_id=job['id'],
-            models=models,
-            threshold=drift_threshold
-        )
+        if schedule is not None:
+            schedule.every().day.do(
+                self._check_model_drift,
+                job_id=job['id'],
+                models=models,
+                threshold=drift_threshold
+            )
+        else:
+            logger.warning("`schedule` package not installed. Adaptive drift checks will be recorded but not automatically scheduled.")
         
         logger.info(f"Scheduled adaptive training with drift threshold {drift_threshold}")
         
@@ -359,6 +369,10 @@ class TrainingScheduler:
         """Start the scheduler in background thread"""
         
         if self.scheduler_running:
+            return
+        
+        if schedule is None:
+            logger.warning("Cannot start schedule runner because `schedule` package is not installed.")
             return
         
         self.scheduler_running = True

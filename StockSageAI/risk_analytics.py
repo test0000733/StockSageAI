@@ -19,6 +19,25 @@ class RiskAnalyticsEngine:
     def __init__(self):
         self.risk_free_rate = 0.03  # 3% annual
     
+    def _download_historical(self, symbol: str, start=None, end=None, days: int = None) -> pd.DataFrame:
+        try:
+            if days is not None:
+                start = datetime.now() - timedelta(days=days)
+                end = datetime.now()
+            df = yf.download(symbol, start=start, end=end, progress_bar=False, quiet=True)
+            if df.empty or 'Close' not in df.columns:
+                ticker = yf.Ticker(symbol)
+                kwargs = {'interval': '1d', 'actions': False}
+                if start is not None:
+                    kwargs['start'] = start
+                if end is not None:
+                    kwargs['end'] = end
+                df = ticker.history(**kwargs)
+            return df
+        except Exception as e:
+            logger.error(f"Error downloading historical data for {symbol}: {e}")
+            return pd.DataFrame()
+
     def calculate_var(self, returns: np.ndarray, confidence: float = 0.95,
                      method: str = 'historical') -> float:
         """Calculate Value at Risk"""
@@ -58,16 +77,12 @@ class RiskAnalyticsEngine:
         
         for symbol in symbols:
             try:
-                hist = yf.download(
-                    symbol,
-                    start=datetime.now() - timedelta(days=days),
-                    progress_bar=False,
-                    quiet=True
-                )
+                hist = self._download_historical(symbol, days=days)
                 
                 if not hist.empty:
                     data[symbol] = hist['Close'].pct_change()
-            except:
+            except Exception as e:
+                logger.error(f"Error downloading correlation data for {symbol}: {e}")
                 pass
         
         if not data:
@@ -80,32 +95,30 @@ class RiskAnalyticsEngine:
         """Calculate various volatility measures"""
         
         try:
-            hist = yf.download(
-                symbol,
-                start=datetime.now() - timedelta(days=days),
-                progress_bar=False,
-                quiet=True
-            )
-            
-            if hist.empty:
+            hist = self._download_historical(symbol, days=days)
+            if hist.empty or 'Close' not in hist.columns:
                 return {}
             
             returns = hist['Close'].pct_change().dropna()
+            if returns.empty:
+                return {}
             
-            # Historical volatility
             hist_vol = np.std(returns) * np.sqrt(252)
-            
-            # Parkinson volatility
             highs = hist['High']
             lows = hist['Low']
+            if highs.empty or lows.empty or len(highs) < 2:
+                return {
+                    'historical': float(hist_vol),
+                    'parkinson': 0.0,
+                    'garman_klass': 0.0,
+                    'average': float(hist_vol)
+                }
             parkinson_vol = np.sqrt(
                 np.mean((np.log(highs / lows) ** 2) / (4 * np.log(2)))
             ) * np.sqrt(252)
             
-            # Garman-Klass volatility
             close_prices = hist['Close']
-            open_prices = hist['Open']
-            
+            open_prices = hist['Open'] if 'Open' in hist.columns else close_prices
             gk_values = (
                 0.5 * np.log(highs / lows) ** 2 -
                 (2 * np.log(2) - 1) * np.log(close_prices / open_prices) ** 2
@@ -127,39 +140,30 @@ class RiskAnalyticsEngine:
         """Calculate Beta and Alpha"""
         
         try:
-            stock_data = yf.download(
-                symbol,
-                start=datetime.now() - timedelta(days=days),
-                progress_bar=False,
-                quiet=True
-            )
-            
-            benchmark_data = yf.download(
-                benchmark,
-                start=datetime.now() - timedelta(days=days),
-                progress_bar=False,
-                quiet=True
-            )
-            
+            stock_data = self._download_historical(symbol, days=days)
+            benchmark_data = self._download_historical(benchmark, days=days)
             if stock_data.empty or benchmark_data.empty:
-                return {}
+                if benchmark != '^GSPC':
+                    benchmark_data = self._download_historical('^GSPC', days=days)
+                if stock_data.empty or benchmark_data.empty:
+                    return {}
             
             stock_returns = stock_data['Close'].pct_change().dropna()
             benchmark_returns = benchmark_data['Close'].pct_change().dropna()
             
-            # Align dates
             dates = stock_returns.index.intersection(benchmark_returns.index)
-            stock_returns = stock_returns[dates]
-            benchmark_returns = benchmark_returns[dates]
+            stock_returns = stock_returns.loc[dates]
+            benchmark_returns = benchmark_returns.loc[dates]
             
-            # Calculate covariance and variance
+            if stock_returns.empty or benchmark_returns.empty:
+                return {}
+            
             covariance = np.cov(stock_returns, benchmark_returns)[0][1]
             benchmark_variance = np.var(benchmark_returns)
+            if benchmark_variance == 0:
+                return {}
             
-            # Beta
             beta = covariance / benchmark_variance
-            
-            # Alpha
             stock_mean_return = np.mean(stock_returns) * 252
             benchmark_mean_return = np.mean(benchmark_returns) * 252
             alpha = stock_mean_return - (self.risk_free_rate + beta * (benchmark_mean_return - self.risk_free_rate))
@@ -200,32 +204,27 @@ class RiskAnalyticsEngine:
         """Calculate maximum drawdown"""
         
         try:
-            hist = yf.download(
-                symbol,
-                start=datetime.now() - timedelta(days=days),
-                progress_bar=False,
-                quiet=True
-            )
-            
-            if hist.empty:
+            hist = self._download_historical(symbol, days=days)
+            if hist.empty or 'Close' not in hist.columns:
                 return {}
             
-            prices = hist['Close'].values
+            prices = hist['Close'].astype(float).values
+            if len(prices) < 2:
+                return {}
+            
             running_max = np.maximum.accumulate(prices)
             drawdown = (prices - running_max) / running_max
             
             max_drawdown = np.min(drawdown)
-            max_drawdown_idx = np.argmin(drawdown)
-            
-            # Find peak before the drawdown
-            peak_idx = np.argmax(prices[:max_drawdown_idx])
+            max_drawdown_idx = int(np.argmin(drawdown))
+            peak_idx = int(np.argmax(prices[:max_drawdown_idx+1])) if max_drawdown_idx >= 0 else 0
             recovery_idx = np.where(prices[max_drawdown_idx:] >= prices[peak_idx])[0]
-            recovery_days = len(hist) - max_drawdown_idx if len(recovery_idx) == 0 else recovery_idx[0]
+            recovery_days = int(len(recovery_idx) and recovery_idx[0] or len(hist) - max_drawdown_idx)
             
             return {
                 'max_drawdown': float(max_drawdown) * 100,
-                'drawdown_start': hist.index[peak_idx].strftime('%Y-%m-%d'),
-                'drawdown_trough': hist.index[max_drawdown_idx].strftime('%Y-%m-%d'),
+                'drawdown_start': hist.index[peak_idx].strftime('%Y-%m-%d') if peak_idx < len(hist.index) else '',
+                'drawdown_trough': hist.index[max_drawdown_idx].strftime('%Y-%m-%d') if max_drawdown_idx < len(hist.index) else '',
                 'recovery_days': int(recovery_days)
             }
         except Exception as e:
@@ -258,17 +257,35 @@ class RiskAnalyticsEngine:
         """Generate comprehensive risk report"""
         
         try:
-            hist = yf.download(
-                symbol,
-                start=datetime.now() - timedelta(days=252),
-                progress_bar=False,
-                quiet=True
-            )
-            
-            if hist.empty:
-                return {}
+            hist = self._download_historical(symbol, days=252)
+            if hist.empty or 'Close' not in hist.columns:
+                return {
+                    'symbol': symbol,
+                    'var_95': 0.0,
+                    'var_99': 0.0,
+                    'cvar_95': 0.0,
+                    'volatility': {},
+                    'max_drawdown': {},
+                    'sharpe_ratio': 0.0,
+                    'sortino_ratio': 0.0,
+                    'beta_alpha': {},
+                    'risk_level': 'UNKNOWN'
+                }
             
             returns = hist['Close'].pct_change().dropna().values
+            if len(returns) == 0:
+                return {
+                    'symbol': symbol,
+                    'var_95': 0.0,
+                    'var_99': 0.0,
+                    'cvar_95': 0.0,
+                    'volatility': {},
+                    'max_drawdown': {},
+                    'sharpe_ratio': 0.0,
+                    'sortino_ratio': 0.0,
+                    'beta_alpha': {},
+                    'risk_level': 'UNKNOWN'
+                }
             
             report = {
                 'symbol': symbol,
@@ -286,7 +303,18 @@ class RiskAnalyticsEngine:
             return report
         except Exception as e:
             logger.error(f"Error generating risk report: {e}")
-            return {}
+            return {
+                'symbol': symbol,
+                'var_95': 0.0,
+                'var_99': 0.0,
+                'cvar_95': 0.0,
+                'volatility': {},
+                'max_drawdown': {},
+                'sharpe_ratio': 0.0,
+                'sortino_ratio': 0.0,
+                'beta_alpha': {},
+                'risk_level': 'UNKNOWN'
+            }
     
     def _categorize_risk(self, returns: np.ndarray) -> str:
         """Categorize risk level"""

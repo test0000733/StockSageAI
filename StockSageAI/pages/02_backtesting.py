@@ -53,11 +53,14 @@ with col3:
 if st.button("Run Backtest", type="primary", use_container_width=True):
     with st.spinner("Running backtest..."):
         try:
-            # Fetch data
-            df = backtest.fetch_historical_data(symbol, str(start_date), str(end_date))
-            
-            if df.empty:
-                st.error("❌ No data available for this symbol and date range")
+            if start_date >= end_date:
+                st.error("❌ Start date must be before end date")
+            else:
+                # Fetch data
+                df = backtest.fetch_historical_data(symbol, str(start_date), str(end_date))
+                
+                if df.empty:
+                    st.error("❌ No data available for this symbol and date range")
             else:
                 # Run backtest
                 result = backtest.backtest(df, strategy, commission)

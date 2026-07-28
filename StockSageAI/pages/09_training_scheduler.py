@@ -132,24 +132,28 @@ with tab1:
             try:
                 if job_type == "Daily Training":
                     result = scheduler.schedule_daily_training(
-                        timezone=timezone,
-                        notification_enabled=enable_notification
+                        models=models_to_train,
+                        time=train_time.strftime("%H:%M")
                     )
-                    success_msg = f"✅ Daily training scheduled for {train_time} {timezone}"
+                    success_msg = f"✅ Daily training scheduled for {train_time.strftime('%H:%M')} {timezone}"
                 
                 elif job_type == "Weekly Training":
                     result = scheduler.schedule_weekly_training(
-                        day_of_week=train_day.lower(),
-                        notification_enabled=enable_notification
+                        models=models_to_train,
+                        day=train_day.lower(),
+                        time=train_time.strftime("%H:%M")
                     )
-                    success_msg = f"✅ Weekly training scheduled for {train_day}s at {train_time}"
+                    success_msg = f"✅ Weekly training scheduled for {train_day}s at {train_time.strftime('%H:%M')}"
                 
-                else:  # Adaptive
+                elif job_type == "Adaptive Training":
                     result = scheduler.schedule_adaptive_training(
-                        drift_threshold=drift_threshold,
-                        notification_enabled=enable_notification
+                        models=models_to_train,
+                        drift_threshold=drift_threshold
                     )
                     success_msg = f"✅ Adaptive training configured (threshold: {drift_threshold:.2%})"
+                else:
+                    result = scheduler._run_training_job(models=models_to_train, job_id=f"manual_{datetime.now().timestamp()}")
+                    success_msg = "✅ One-time training job executed"
                 
                 st.success(success_msg)
                 st.info("Job created and monitoring started")

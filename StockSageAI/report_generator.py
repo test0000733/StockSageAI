@@ -9,6 +9,11 @@ import pandas as pd
 import numpy as np
 import logging
 
+try:
+    import schedule
+except ImportError:
+    schedule = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -17,63 +22,41 @@ class ReportGenerator:
     
     def __init__(self):
         self.report_formats = ['pdf', 'html', 'json', 'csv']
+        self.scheduled_reports = []
     
     def generate_daily_report(self, user_id: str, symbols: List[str],
                             portfolio_data: Dict = None) -> Dict:
         """Generate daily summary report"""
         
         try:
+            executive_summary = self._generate_executive_summary(symbols)
+            market_overview = self._generate_market_overview(symbols)
+            stock_analysis = self._generate_stock_analysis(symbols)
+            portfolio_status = self._format_portfolio_status(portfolio_data) if portfolio_data else {}
+            trading_signals = self._generate_signals_summary(symbols)
+            risk_analysis = self._generate_risk_analysis(symbols)
+
             report = {
                 'type': 'DAILY',
                 'user_id': user_id,
                 'generated_at': datetime.now().isoformat(),
                 'symbols_analyzed': symbols,
-                'sections': []
+                'summary': executive_summary,
+                'market_overview': market_overview,
+                'stock_analysis': stock_analysis,
+                'portfolio_status': portfolio_status,
+                'trading_signals': trading_signals,
+                'risk_analysis': risk_analysis,
+                'sections': [
+                    {'title': 'Executive Summary', 'content': executive_summary, 'priority': 'high'},
+                    {'title': 'Market Overview', 'content': market_overview, 'priority': 'high'},
+                    {'title': 'Stock Analysis', 'content': stock_analysis, 'priority': 'high'},
+                    {'title': 'Portfolio Status', 'content': portfolio_status, 'priority': 'high'} if portfolio_data else None,
+                    {'title': 'Trading Signals', 'content': trading_signals, 'priority': 'medium'},
+                    {'title': 'Risk Analysis', 'content': risk_analysis, 'priority': 'medium'}
+                ]
             }
-            
-            # Executive Summary
-            report['sections'].append({
-                'title': 'Executive Summary',
-                'content': self._generate_executive_summary(symbols),
-                'priority': 'high'
-            })
-            
-            # Market Overview
-            report['sections'].append({
-                'title': 'Market Overview',
-                'content': self._generate_market_overview(symbols),
-                'priority': 'high'
-            })
-            
-            # Stock Analysis
-            report['sections'].append({
-                'title': 'Stock Analysis',
-                'content': self._generate_stock_analysis(symbols),
-                'priority': 'high'
-            })
-            
-            # Portfolio Status
-            if portfolio_data:
-                report['sections'].append({
-                    'title': 'Portfolio Status',
-                    'content': self._format_portfolio_status(portfolio_data),
-                    'priority': 'high'
-                })
-            
-            # Trading Signals
-            report['sections'].append({
-                'title': 'Trading Signals',
-                'content': self._generate_signals_summary(symbols),
-                'priority': 'medium'
-            })
-            
-            # Risk Analysis
-            report['sections'].append({
-                'title': 'Risk Analysis',
-                'content': self._generate_risk_analysis(symbols),
-                'priority': 'medium'
-            })
-            
+            report['sections'] = [section for section in report['sections'] if section is not None]
             return report
         except Exception as e:
             logger.error(f"Error generating daily report: {e}")
@@ -84,61 +67,106 @@ class ReportGenerator:
         """Generate weekly comprehensive report"""
         
         try:
+            weekly_summary = self._generate_weekly_summary(symbols)
+            model_performance = self._generate_model_performance()
+            sector_analysis = self._generate_sector_analysis()
+            recommendations = self._generate_recommendations(symbols)
+            key_insights = self._generate_key_insights()
+
             report = {
                 'type': 'WEEKLY',
                 'user_id': user_id,
                 'week_start': (datetime.now() - timedelta(days=7)).isoformat(),
                 'week_end': datetime.now().isoformat(),
-                'sections': []
+                'summary': weekly_summary,
+                'performance_analysis': performance_data or {},
+                'model_accuracy': model_performance,
+                'sector_analysis': sector_analysis,
+                'recommendations': recommendations,
+                'key_insights': key_insights,
+                'sections': [
+                    {'title': 'Weekly Summary', 'content': weekly_summary, 'priority': 'high'},
+                    {'title': 'Performance Analysis', 'content': performance_data or {}, 'priority': 'high'} if performance_data else None,
+                    {'title': 'Model Performance', 'content': model_performance, 'priority': 'high'},
+                    {'title': 'Sector Analysis', 'content': sector_analysis, 'priority': 'medium'},
+                    {'title': 'Top Recommendations', 'content': recommendations, 'priority': 'high'},
+                    {'title': 'Key Insights', 'content': key_insights, 'priority': 'high'}
+                ]
             }
-            
-            # Weekly Summary
-            report['sections'].append({
-                'title': 'Weekly Summary',
-                'content': self._generate_weekly_summary(symbols),
-                'priority': 'high'
-            })
-            
-            # Performance Analysis
-            if performance_data:
-                report['sections'].append({
-                    'title': 'Performance Analysis',
-                    'content': performance_data,
-                    'priority': 'high'
-                })
-            
-            # Model Accuracy
-            report['sections'].append({
-                'title': 'Model Performance',
-                'content': self._generate_model_performance(),
-                'priority': 'high'
-            })
-            
-            # Sector Analysis
-            report['sections'].append({
-                'title': 'Sector Analysis',
-                'content': self._generate_sector_analysis(),
-                'priority': 'medium'
-            })
-            
-            # Recommendations
-            report['sections'].append({
-                'title': 'Top Recommendations',
-                'content': self._generate_recommendations(symbols),  
-                'priority': 'high'
-            })
-            
-            # Key Insights
-            report['sections'].append({
-                'title': 'Key Insights',
-                'content': self._generate_key_insights(),
-                'priority': 'high'
-            })
-            
+            report['sections'] = [section for section in report['sections'] if section is not None]
             return report
         except Exception as e:
             logger.error(f"Error generating weekly report: {e}")
             return {}
+
+    def generate_report(self, report_type: str, user_id: str, symbols: List[str], export_format: str = 'json') -> Dict:
+        """Generate a report by type."""
+        report_type = (report_type or 'daily').lower()
+        if report_type == 'daily':
+            return self.generate_daily_report(user_id=user_id, symbols=symbols)
+        elif report_type == 'weekly':
+            return self.generate_weekly_report(user_id=user_id, symbols=symbols)
+        else:
+            logger.warning(f"Unknown report type: {report_type}. Falling back to daily report.")
+            return self.generate_daily_report(user_id=user_id, symbols=symbols)
+
+    def schedule_daily_training(self, report_type: str, symbols: List[str], time: str = '09:00', timezone: str = 'UTC') -> Dict:
+        """Schedule a daily report generation job."""
+        job = {
+            'id': f"report_daily_{datetime.now().timestamp()}",
+            'type': 'daily',
+            'report_type': report_type,
+            'symbols': symbols,
+            'time': time,
+            'timezone': timezone,
+            'status': 'scheduled',
+            'created_at': datetime.now().isoformat(),
+            'next_run': self._calculate_next_run('daily', time)
+        }
+        self.scheduled_reports.append(job)
+        if schedule is not None:
+            schedule.every().day.at(time).do(self._run_scheduled_report, job=job)
+        return job
+
+    def schedule_weekly_training(self, report_type: str, symbols: List[str], day: str = 'Monday', time: str = '09:00', timezone: str = 'UTC') -> Dict:
+        """Schedule a weekly report generation job."""
+        job = {
+            'id': f"report_weekly_{datetime.now().timestamp()}",
+            'type': 'weekly',
+            'report_type': report_type,
+            'symbols': symbols,
+            'day': day,
+            'time': time,
+            'timezone': timezone,
+            'status': 'scheduled',
+            'created_at': datetime.now().isoformat(),
+            'next_run': self._calculate_next_run('weekly', time, day)
+        }
+        self.scheduled_reports.append(job)
+        if schedule is not None:
+            day_map = {
+                'monday': schedule.every().monday,
+                'tuesday': schedule.every().tuesday,
+                'wednesday': schedule.every().wednesday,
+                'thursday': schedule.every().thursday,
+                'friday': schedule.every().friday,
+                'saturday': schedule.every().saturday,
+                'sunday': schedule.every().sunday
+            }
+            schedule_day = day_map.get(day.lower())
+            if schedule_day is not None:
+                schedule_day.at(time).do(self._run_scheduled_report, job=job)
+        return job
+
+    def _run_scheduled_report(self, job: Dict) -> Dict:
+        """Run a scheduled report generation task."""
+        try:
+            report = self.generate_report(job.get('report_type', 'daily'), user_id='system', symbols=job.get('symbols', []))
+            job['last_run'] = datetime.now().isoformat()
+            return {'job': job, 'report': report}
+        except Exception as e:
+            logger.error(f"Error running scheduled report: {e}")
+            return {'job': job, 'error': str(e)}
     
     def _generate_executive_summary(self, symbols: List[str]) -> Dict:
         """Generate executive summary"""
@@ -325,17 +353,24 @@ class ReportGenerator:
             return None
     
     def schedule_report_generation(self, user_id: str, frequency: str = 'daily',
-                                  time: str = '09:00') -> Dict:
+                                  time: str = '09:00', day: str = None,
+                                  timezone: str = 'UTC', email: str = None) -> Dict:
         """Schedule automated report generation"""
         
-        return {
+        schedule_info = {
             'user_id': user_id,
             'frequency': frequency,
+            'day': day,
+            'timezone': timezone,
             'scheduled_time': time,
             'status': 'active',
-            'next_generation': self._calculate_next_generation(frequency, time),
-            'email_enabled': True
+            'next_generation': self._calculate_next_generation(frequency, time, day),
+            'email_enabled': bool(email),
+            'email_address': email
         }
+        
+        logger.info(f"Scheduled report generation: {schedule_info}")
+        return schedule_info
     
     def _calculate_next_generation(self, frequency: str, time: str) -> str:
         """Calculate next report generation time"""

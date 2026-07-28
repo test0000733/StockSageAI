@@ -27,7 +27,7 @@ class StockComparator:
         for symbol in symbols:
             try:
                 ticker = yf.Ticker(symbol)
-                info = ticker.info
+                info = ticker.info if hasattr(ticker, 'info') else {}
                 
                 # Historical data for calculating metrics
                 hist = yf.download(
@@ -37,36 +37,45 @@ class StockComparator:
                     quiet=True
                 )
                 
-                if hist.empty:
+                if hist.empty or 'Close' not in hist.columns:
+                    hist = ticker.history(period='1y', interval='1d', actions=False)
+                if hist.empty or 'Close' not in hist.columns:
                     continue
+                
+                price = info.get('currentPrice') or float(hist['Close'].iloc[-1])
+                pe = info.get('trailingPE') or 0
+                dividend = info.get('dividendRate') or 0
+                close_returns = hist['Close'].pct_change().dropna()
+                volatility = float(close_returns.std() * np.sqrt(252)) if not close_returns.empty else 0.0
+                change_1d = float(close_returns.iloc[-1] * 100) if not close_returns.empty else 0.0
+                change_1m = float((hist['Close'].iloc[-1] / hist['Close'].iloc[-22] - 1) * 100) if len(hist) > 22 else 0.0
+                change_1y = float((hist['Close'].iloc[-1] / hist['Close'].iloc[0] - 1) * 100) if len(hist) > 1 else 0.0
+                sharpe_ratio = float(np.mean(close_returns) / (np.std(close_returns) + 1e-10) * np.sqrt(252)) if not close_returns.empty else 0.0
                 
                 stock_data = {
                     'symbol': symbol,
-                    'name': info.get('longName', symbol),
-                    'price': info.get('currentPrice', 0),
-                    'pe': info.get('trailingPE', 0),
-                    'pb': info.get('priceToBook', 0),
-                    'dividend': info.get('dividendRate', 0),
-                    'revenue': info.get('totalRevenue', 0),
-                    'market_cap': info.get('marketCap', 0),
-                    'eps': info.get('trailingEps', 0),
-                    'profit_margin': info.get('profitMargins', 0),
-                    'roe': info.get('returnOnEquity', 0),
-                    'debt_to_equity': info.get('debtToEquity', 0),
+                    'name': info.get('longName') or symbol,
+                    'price': price,
+                    'pe': pe,
+                    'pb': info.get('priceToBook') or 0,
+                    'dividend': dividend,
+                    'revenue': info.get('totalRevenue') or 0,
+                    'market_cap': info.get('marketCap') or 0,
+                    'eps': info.get('trailingEps') or 0,
+                    'profit_margin': info.get('profitMargins') or 0,
+                    'roe': info.get('returnOnEquity') or 0,
+                    'debt_to_equity': info.get('debtToEquity') or 0,
+                    'volatility': volatility,
+                    'change_1d': change_1d,
+                    'change_1m': change_1m,
+                    'change_1y': change_1y,
+                    'sharpe_ratio': sharpe_ratio
                 }
-                
-                # Calculate technical metrics
-                returns = hist['Close'].pct_change()
-                stock_data['volatility'] = float(returns.std() * np.sqrt(252))
-                stock_data['change_1d'] = float(returns.iloc[-1] * 100)
-                stock_data['change_1m'] = float((hist['Close'].iloc[-1] / hist['Close'].iloc[-22] - 1) * 100)
-                stock_data['change_1y'] = float((hist['Close'].iloc[-1] / hist['Close'].iloc[0] - 1) * 100)
-                stock_data['sharpe_ratio'] = float(np.mean(returns) / (np.std(returns) + 1e-10) * np.sqrt(252))
                 
                 results.append(stock_data)
             except Exception as e:
                 logger.error(f"Error comparing {symbol}: {e}")
-                pass
+                continue
         
         return pd.DataFrame(results)
     

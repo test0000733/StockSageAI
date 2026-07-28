@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 
 from StockSageAI.training_scheduler import get_training_scheduler
+from StockSageAI.trained_model_manager import get_all_model_names
 
 st.set_page_config(page_title="Training Scheduler", layout="wide")
 
@@ -130,30 +131,36 @@ with tab1:
     if st.button("Create Job", type="primary", use_container_width=True):
         with st.spinner("Creating training job..."):
             try:
-                if job_type == "Daily Training":
-                    result = scheduler.schedule_daily_training(
-                        timezone=timezone,
-                        notification_enabled=enable_notification
-                    )
-                    success_msg = f"✅ Daily training scheduled for {train_time} {timezone}"
-                
-                elif job_type == "Weekly Training":
-                    result = scheduler.schedule_weekly_training(
-                        day_of_week=train_day.lower(),
-                        notification_enabled=enable_notification
-                    )
-                    success_msg = f"✅ Weekly training scheduled for {train_day}s at {train_time}"
-                
-                else:  # Adaptive
-                    result = scheduler.schedule_adaptive_training(
-                        drift_threshold=drift_threshold,
-                        notification_enabled=enable_notification
-                    )
-                    success_msg = f"✅ Adaptive training configured (threshold: {drift_threshold:.2%})"
-                
-                st.success(success_msg)
-                st.info("Job created and monitoring started")
-            
+                models_to_run = get_all_model_names() if "All 8 Models" in models_to_train else models_to_train
+                if not models_to_run:
+                    st.warning("Please select at least one model to train.")
+                else:
+                    if job_type == "Daily Training":
+                        result = scheduler.schedule_daily_training(
+                            models=models_to_run,
+                            time=train_time.strftime("%H:%M")
+                        )
+                        success_msg = f"✅ Daily training scheduled for {train_time.strftime('%H:%M')} {timezone}"
+                    elif job_type == "Weekly Training":
+                        result = scheduler.schedule_weekly_training(
+                            models=models_to_run,
+                            day=train_day,
+                            time=train_time.strftime("%H:%M")
+                        )
+                        success_msg = f"✅ Weekly training scheduled for {train_day} at {train_time.strftime('%H:%M')}"
+                    elif job_type == "Adaptive Training":
+                        result = scheduler.schedule_adaptive_training(
+                            models=models_to_run,
+                            drift_threshold=drift_threshold
+                        )
+                        success_msg = f"✅ Adaptive training configured (threshold: {drift_threshold:.2%})"
+                    else:
+                        job_id = f"manual_{int(datetime.now().timestamp())}"
+                        result = scheduler._run_training_job(models_to_run, job_id=job_id)
+                        success_msg = "✅ Manual training executed"
+
+                    st.success(success_msg)
+                    st.info("Job created and monitoring started")
             except Exception as e:
                 st.error(f"Error: {str(e)}")
 
