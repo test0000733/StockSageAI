@@ -3206,6 +3206,21 @@ def add_sidebar_navigation():
             st.session_state.page = 'settings'
             st.rerun()
 
+        st.divider()
+        st.subheader("Advanced Features")
+        
+        # Advanced features page links
+        st.page_link("pages/01_portfolio_manager.py", label="💼 Portfolio Manager")
+        st.page_link("pages/02_backtesting.py", label="📊 Backtesting")
+        st.page_link("pages/03_risk_analytics.py", label="📉 Risk Analytics")
+        st.page_link("pages/04_stock_comparison.py", label="🔀 Stock Comparison")
+        st.page_link("pages/05_pattern_recognition.py", label="🔍 Pattern Recognition")
+        st.page_link("pages/06_trading_signals.py", label="📡 Trading Signals")
+        st.page_link("pages/07_model_explainability.py", label="🔬 Model Explainability")
+        st.page_link("pages/08_report_generator.py", label="📄 Report Generator")
+        st.page_link("pages/09_api_gateway.py", label="🔌 API Gateway")
+        st.page_link("pages/09_training_scheduler.py", label="🤖 Training Scheduler")
+
         if auth_manager.has_any_role(['Super Admin', 'Admin']):
             st.divider()
             
