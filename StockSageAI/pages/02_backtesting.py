@@ -61,9 +61,9 @@ if st.button("Run Backtest", type="primary", use_container_width=True):
                 
                 if df.empty:
                     st.error("❌ No data available for this symbol and date range")
-            else:
-                # Run backtest
-                result = backtest.backtest(df, strategy, commission)
+                else:
+                    # Run backtest
+                    result = backtest.backtest(df, strategy, commission)
                 
                 # Display results
                 st.success("✅ Backtest completed!")
