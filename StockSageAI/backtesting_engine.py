@@ -10,6 +10,7 @@ from typing import Dict, List, Tuple, Optional
 import yfinance as yf
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 import logging
+from StockSageAI.utils import safe_download
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ class BacktestingEngine:
     
     def _download_data(self, symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
         try:
-            df = yf.download(symbol, start=start_date, end=end_date, progress_bar=False, quiet=True)
+            df = safe_download(symbol, start=start_date, end=end_date, progress=False)
             if df.empty or 'Close' not in df.columns:
                 ticker = yf.Ticker(symbol)
                 df = ticker.history(start=start_date, end=end_date, interval='1d', actions=False)
@@ -215,8 +216,8 @@ class BacktestingEngine:
                     'sharpe': backtest_result['sharpe_ratio'],
                     'drawdown': backtest_result['max_drawdown']
                 })
-            except:
-                pass
+            except Exception as e:
+                logger.exception("Error running backtest for period %s to %s", train_df.index[0], test_df.index[-1])
         
         return {
             'periods': results,

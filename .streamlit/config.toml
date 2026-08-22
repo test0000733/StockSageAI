@@ -1,8 +1,9 @@
 [server]
 headless = true
-enableCORS = false
-enableXsrfProtection = true
+enableCORS = true
+enableXsrfProtection = false
 fileWatcherType = "none"
+port = 8501
 
 [client]
 showErrorDetails = false

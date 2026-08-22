@@ -56,8 +56,13 @@ with tab1:
                 symbol_list = [s.strip().upper() for s in symbols.split(",")]
                 
                 # Generate report
+                user_id = None
+                if st.session_state.get('user'):
+                    user_id = st.session_state.user.get('id') or st.session_state.user.get('username')
+
                 report = generator.generate_report(
                     report_type=report_type,
+                    user_id=user_id,
                     symbols=symbol_list,
                     export_format=export_format
                 )

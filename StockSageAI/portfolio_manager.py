@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple
 import yfinance as yf
 import logging
+from StockSageAI.utils import safe_download
 
 logger = logging.getLogger(__name__)
 
@@ -164,8 +165,8 @@ class PortfolioManager:
                     'gain_pct': gain_pct,
                     'weight': current_value / (total_current_value + 0.001)
                 })
-            except:
-                pass
+            except Exception as e:
+                logger.exception("Error computing holding metrics for %s", row['symbol'])
         
         if not metrics:
             return {
@@ -201,18 +202,17 @@ class PortfolioManager:
         
         for _, row in holdings.iterrows():
             try:
-                hist = yf.download(
+                hist = safe_download(
                     row['symbol'],
                     start=datetime.now() - timedelta(days=days),
-                    progress_bar=False,
-                    quiet=True
+                    progress=False
                 )
                 
                 if not hist.empty:
                     daily_returns = hist['Close'].pct_change().dropna()
                     returns_list.extend(daily_returns)
-            except:
-                pass
+            except Exception as e:
+                logger.exception("Error downloading data for %s in calculate_var", row['symbol'])
         
         if not returns_list:
             return 0
@@ -234,25 +234,23 @@ class PortfolioManager:
         
         for _, row in holdings.iterrows():
             try:
-                hist = yf.download(
+                hist = safe_download(
                     row['symbol'],
                     start=datetime.now() - timedelta(days=252),
-                    progress_bar=False,
-                    quiet=True
+                    progress=False
                 )
                 if not hist.empty:
                     prices_dict[row['symbol']] = hist['Close'].pct_change()
-            except:
-                pass
+            except Exception as e:
+                logger.exception("Error downloading data for %s in get_correlation_matrix", row['symbol'])
         
         if not prices_dict:
             return pd.DataFrame()
         
         df = pd.DataFrame(prices_dict)
         return df.corr()
-    
-    def remove_holding(self, portfolio_id: int, symbol: str) -> bool:
-        """Remove holding from portfolio"""
+        
+    def delete_holding(self, portfolio_id: int, symbol: str) -> bool:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
@@ -263,7 +261,8 @@ class PortfolioManager:
             )
             conn.commit()
             return True
-        except:
+        except Exception as e:
+            logger.exception("Error deleting holding %s from portfolio %s", symbol, portfolio_id)
             return False
         finally:
             conn.close()

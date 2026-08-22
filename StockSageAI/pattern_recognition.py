@@ -9,6 +9,7 @@ from typing import Dict, List, Tuple, Optional
 import yfinance as yf
 from datetime import datetime, timedelta
 import logging
+from StockSageAI.utils import safe_download
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +35,17 @@ class PatternRecognizer:
         """Detect all patterns in recent data"""
         
         try:
-            hist = yf.download(
+            hist = safe_download(
                 symbol,
                 start=datetime.now() - timedelta(days=lookback_days),
-                progress_bar=False,
-                quiet=True
+                progress=False
             )
+            
+            if isinstance(hist.columns, pd.MultiIndex):
+                try:
+                    hist = hist.xs(symbol, axis=1, level='Ticker')
+                except KeyError:
+                    hist = hist.droplevel('Ticker', axis=1)
             
             if hist.empty or len(hist) < 3:
                 return {}
@@ -48,8 +54,11 @@ class PatternRecognizer:
             
             for pattern_name, detector in self.patterns.items():
                 detected = detector(hist)
-                if detected:
-                    patterns_found[pattern_name] = detected
+                if detected is None:
+                    continue
+                if isinstance(detected, pd.Series) and detected.empty:
+                    continue
+                patterns_found[pattern_name] = detected
             
             return {
                 'symbol': symbol,
@@ -356,11 +365,10 @@ class PatternRecognizer:
         """Get statistics on pattern occurrences"""
         
         try:
-            hist = yf.download(
+            hist = safe_download(
                 symbol,
                 start=datetime.now() - timedelta(days=days),
-                progress_bar=False,
-                quiet=True
+                progress=False
             )
             
             if hist.empty:

@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
 import yfinance as yf
 import logging
+from StockSageAI.utils import safe_download
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class RiskAnalyticsEngine:
             if days is not None:
                 start = datetime.now() - timedelta(days=days)
                 end = datetime.now()
-            df = yf.download(symbol, start=start, end=end, progress_bar=False, quiet=True)
+            df = safe_download(symbol, start=start, end=end, progress=False)
             if df.empty or 'Close' not in df.columns:
                 ticker = yf.Ticker(symbol)
                 kwargs = {'interval': '1d', 'actions': False}
@@ -33,6 +34,8 @@ class RiskAnalyticsEngine:
                 if end is not None:
                     kwargs['end'] = end
                 df = ticker.history(**kwargs)
+            if df.empty or 'Close' not in df.columns:
+                raise ValueError(f"Downloaded market data is empty for {symbol}")
             return df
         except Exception as e:
             logger.error(f"Error downloading historical data for {symbol}: {e}")
@@ -155,12 +158,12 @@ class RiskAnalyticsEngine:
             stock_returns = stock_returns.loc[dates]
             benchmark_returns = benchmark_returns.loc[dates]
             
-            if stock_returns.empty or benchmark_returns.empty:
+            if stock_returns.empty or benchmark_returns.empty or len(stock_returns) < 2 or len(benchmark_returns) < 2:
                 return {}
             
-            covariance = np.cov(stock_returns, benchmark_returns)[0][1]
+            covariance = np.cov(stock_returns, benchmark_returns, ddof=0)[0][1]
             benchmark_variance = np.var(benchmark_returns)
-            if benchmark_variance == 0:
+            if benchmark_variance == 0 or np.isnan(covariance):
                 return {}
             
             beta = covariance / benchmark_variance

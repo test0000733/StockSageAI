@@ -163,6 +163,13 @@ def validate_stock_symbol(symbol):
 # Keep the old function name for backward compatibility
 validate_nse_symbol = validate_stock_symbol
 
+
+def safe_download(*args, **kwargs):
+    """Safely call yfinance.download while removing unsupported arguments."""
+    kwargs.pop('quiet', None)
+    kwargs.pop('progress_bar', None)
+    return yf.download(*args, **kwargs)
+
 def calculate_technical_indicators(df):
     """Calculate various technical indicators for the stock data"""
     if df.empty:

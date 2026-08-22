@@ -184,3 +184,7 @@ class RegimeEngine:
             'state_probabilities': state_probabilities,
             'anomaly_score': round(anomaly_score, 1)
         }
+
+    def detect_regimes(self, df: pd.DataFrame) -> dict:
+        """Legacy compatibility alias for detect_regime()."""
+        return self.detect_regime(df)

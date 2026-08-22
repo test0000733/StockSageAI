@@ -10,6 +10,7 @@ from typing import Dict, List, Tuple, Optional
 import yfinance as yf
 import sqlite3
 import logging
+from StockSageAI.utils import safe_download
 
 logger = logging.getLogger(__name__)
 
@@ -81,11 +82,14 @@ class TradingSignalsGenerator:
             stop_loss = current_price * (1 - confidence/100 * 0.01)
             
             # Get additional technical analysis
-            hist = yf.download(symbol, period='3mo', progress_bar=False, quiet=True)
+            hist = safe_download(symbol, period='3mo', progress=False)
+            close_series = hist['Close']
+            if isinstance(close_series, pd.DataFrame):
+                close_series = close_series.iloc[:, 0]
             
-            rsi = self._calculate_rsi(hist['Close'])
-            macd = self._calculate_macd(hist['Close'])
-            volatility = hist['Close'].pct_change().std()
+            rsi = self._calculate_rsi(close_series)
+            macd = self._calculate_macd(close_series)
+            volatility = float(close_series.pct_change().std())
             
             return {
                 'symbol': symbol,
@@ -133,7 +137,11 @@ class TradingSignalsGenerator:
         loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
         rs = gain / loss
         rsi = 100 - (100 / (1 + rs))
-        return float(rsi.iloc[-1])
+        result = rsi.iloc[-1]
+        if isinstance(result, pd.Series):
+            result = result.dropna()
+            result = result.iloc[-1] if not result.empty else result.iloc[0]
+        return float(result)
     
     def _calculate_macd(self, prices: pd.Series) -> Dict:
         """Calculate MACD"""
@@ -142,10 +150,21 @@ class TradingSignalsGenerator:
         macd_line = ema_12 - ema_26
         signal_line = macd_line.ewm(span=9).mean()
         
+        macd_value = macd_line.iloc[-1]
+        signal_value = signal_line.iloc[-1]
+        hist_value = (macd_line - signal_line).iloc[-1]
+
+        if isinstance(macd_value, pd.Series):
+            macd_value = macd_value.dropna().iloc[-1] if not macd_value.dropna().empty else macd_value.iloc[0]
+        if isinstance(signal_value, pd.Series):
+            signal_value = signal_value.dropna().iloc[-1] if not signal_value.dropna().empty else signal_value.iloc[0]
+        if isinstance(hist_value, pd.Series):
+            hist_value = hist_value.dropna().iloc[-1] if not hist_value.dropna().empty else hist_value.iloc[0]
+
         return {
-            'macd': float(macd_line.iloc[-1]),
-            'signal': float(signal_line.iloc[-1]),
-            'histogram': float((macd_line - signal_line).iloc[-1])
+            'macd': float(macd_value),
+            'signal': float(signal_value),
+            'histogram': float(hist_value)
         }
     
     def save_signal(self, user_id: str, signal_data: Dict) -> int:
@@ -205,7 +224,8 @@ class TradingSignalsGenerator:
                 })
             
             return results
-        except:
+        except Exception as e:
+            logger.exception("Error fetching saved signals")
             return []
         finally:
             conn.close()
@@ -258,7 +278,8 @@ class TradingSignalsGenerator:
                 'outcome': outcome,
                 'distance_to_target': abs((target_price - current_price) / entry_price) * 100
             }
-        except:
+        except Exception as e:
+            logger.exception("Error calculating signal performance for %s", signal_id)
             return {}
         finally:
             conn.close()
@@ -293,7 +314,8 @@ class TradingSignalsGenerator:
                 'avg_accuracy': avg_accuracy,
                 'period_days': days
             }
-        except:
+        except Exception as e:
+            logger.exception("Error generating signal accuracy report for user %s", user_id)
             return {}
         finally:
             conn.close()

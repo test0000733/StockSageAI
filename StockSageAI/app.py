@@ -1258,10 +1258,15 @@ def show_analysis_page():
 
     # Clean and convert symbol
     stock_symbol = stock_symbol.strip().upper()
-    
-    # Try to convert company name to symbol using utility function
-    resolved_symbol = get_stock_symbol(stock_symbol)
-    
+
+    # Try to resolve symbol from the local equity list first
+    resolved_symbol = None
+    if data_loader is not None:
+        resolved_symbol = data_loader.resolve_stock_symbol(stock_symbol)
+
+    if not resolved_symbol:
+        resolved_symbol = get_stock_symbol(stock_symbol)
+
     st.markdown(f"### Analysis for {stock_symbol.upper()}")
     
     # Create a placeholder for the loader that can be cleared later

@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional
 import yfinance as yf
 import logging
+from StockSageAI.utils import safe_download
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,11 @@ logger = logging.getLogger(__name__)
 class StockComparator:
     """Compare multiple stocks simultaneously"""
     
+    def _ensure_series(self, data):
+        if isinstance(data, pd.DataFrame):
+            return data.iloc[:, 0]
+        return data
+
     def compare_stocks(self, symbols: List[str], metrics: List[str] = None) -> pd.DataFrame:
         """Compare stocks across various metrics"""
         
@@ -30,11 +36,10 @@ class StockComparator:
                 info = ticker.info if hasattr(ticker, 'info') else {}
                 
                 # Historical data for calculating metrics
-                hist = yf.download(
+                hist = safe_download(
                     symbol,
                     start=datetime.now() - timedelta(days=365),
-                    progress_bar=False,
-                    quiet=True
+                    progress=False
                 )
                 
                 if hist.empty or 'Close' not in hist.columns:
@@ -42,14 +47,19 @@ class StockComparator:
                 if hist.empty or 'Close' not in hist.columns:
                     continue
                 
-                price = info.get('currentPrice') or float(hist['Close'].iloc[-1])
+                close_data = self._ensure_series(hist['Close'])
+                price = info.get('currentPrice') or close_data.iloc[-1]
+                try:
+                    price = float(price)
+                except (TypeError, ValueError):
+                    price = float(close_data.iloc[-1])
                 pe = info.get('trailingPE') or 0
                 dividend = info.get('dividendRate') or 0
-                close_returns = hist['Close'].pct_change().dropna()
+                close_returns = close_data.pct_change().dropna()
                 volatility = float(close_returns.std() * np.sqrt(252)) if not close_returns.empty else 0.0
                 change_1d = float(close_returns.iloc[-1] * 100) if not close_returns.empty else 0.0
-                change_1m = float((hist['Close'].iloc[-1] / hist['Close'].iloc[-22] - 1) * 100) if len(hist) > 22 else 0.0
-                change_1y = float((hist['Close'].iloc[-1] / hist['Close'].iloc[0] - 1) * 100) if len(hist) > 1 else 0.0
+                change_1m = float((close_data.iloc[-1] / close_data.iloc[-22] - 1) * 100) if len(close_data) > 22 else 0.0
+                change_1y = float((close_data.iloc[-1] / close_data.iloc[0] - 1) * 100) if len(close_data) > 1 else 0.0
                 sharpe_ratio = float(np.mean(close_returns) / (np.std(close_returns) + 1e-10) * np.sqrt(252)) if not close_returns.empty else 0.0
                 
                 stock_data = {
@@ -86,16 +96,16 @@ class StockComparator:
             prices = {}
             
             for symbol in symbols:
-                hist = yf.download(
+                hist = safe_download(
                     symbol,
                     start=datetime.now() - timedelta(days=days),
-                    progress_bar=False,
-                    quiet=True
+                    progress=False
                 )
                 
                 if not hist.empty:
+                    close_data = self._ensure_series(hist['Close'])
                     # Normalize to 100
-                    prices[symbol] = (hist['Close'] / hist['Close'].iloc[0]) * 100
+                    prices[symbol] = (close_data / close_data.iloc[0]) * 100
             
             if not prices:
                 return {}
@@ -144,8 +154,8 @@ class StockComparator:
                         sectors[sector] = []
                     
                     sectors[sector].append(symbol)
-                except:
-                    pass
+                except Exception as e:
+                    logger.exception("Error fetching ticker info for %s in sector_performance_comparison", symbol)
             
             sector_analysis = {}
             
@@ -154,18 +164,17 @@ class StockComparator:
                 
                 for symbol in sector_symbols:
                     try:
-                        hist = yf.download(
+                        hist = safe_download(
                             symbol,
                             start=datetime.now() - timedelta(days=252),
-                            progress_bar=False,
-                            quiet=True
+                            progress=False
                         )
-                        
                         if not hist.empty:
-                            returns = hist['Close'].pct_change()
+                            close_data = self._ensure_series(hist['Close'])
+                            returns = close_data.pct_change()
                             returns_list.extend(returns)
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.exception("Error downloading historical data for %s in sector_performance_comparison", symbol)
                 
                 if returns_list:
                     sector_analysis[sector] = {
@@ -187,15 +196,15 @@ class StockComparator:
             data = {}
             
             for symbol in symbols:
-                hist = yf.download(
+                hist = safe_download(
                     symbol,
                     start=datetime.now() - timedelta(days=days),
-                    progress_bar=False,
-                    quiet=True
+                    progress=False
                 )
                 
                 if not hist.empty:
-                    data[symbol] = hist['Close'].pct_change()
+                    close_data = self._ensure_series(hist['Close'])
+                    data[symbol] = close_data.pct_change()
             
             if not data:
                 return {}
@@ -242,8 +251,8 @@ class StockComparator:
                     'avg_dividend': float(avg_dividend),
                     'last_dividend_date': str(div_history.index[-1]) if not div_history.empty else 'N/A'
                 })
-            except:
-                pass
+            except Exception as e:
+                logger.exception("Error fetching dividend data for %s", symbol)
         
         return pd.DataFrame(results)
     
@@ -266,8 +275,8 @@ class StockComparator:
                     'roic': info.get('returnOnCapital', 0),
                     'peg_ratio': info.get('pegRatio', 0)
                 })
-            except:
-                pass
+            except Exception as e:
+                logger.exception("Error fetching growth metrics for %s", symbol)
         
         return pd.DataFrame(results)
     
@@ -307,7 +316,8 @@ class StockComparator:
             # This is simplified - in production you'd use a broader database
             # For now, return empty list as we'd need stock list database
             return []
-        except:
+        except Exception as e:
+            logger.exception("Error finding similar stocks for %s", symbol)
             return []
 
 

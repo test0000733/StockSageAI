@@ -99,8 +99,9 @@ class ReportGenerator:
             logger.error(f"Error generating weekly report: {e}")
             return {}
 
-    def generate_report(self, report_type: str, user_id: str, symbols: List[str], export_format: str = 'json') -> Dict:
+    def generate_report(self, report_type: str, user_id: Optional[str] = None, symbols: List[str] = None, export_format: str = 'json') -> Dict:
         """Generate a report by type."""
+        symbols = symbols or []
         report_type = (report_type or 'daily').lower()
         if report_type == 'daily':
             return self.generate_daily_report(user_id=user_id, symbols=symbols)

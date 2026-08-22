@@ -207,9 +207,48 @@ class StockDataLoader:
 
         return self.master_dataset
 
+    def normalize_symbol(self, symbol: str) -> str:
+        """Normalize stock symbol by removing exchange suffixes"""
+        if not symbol or not isinstance(symbol, str):
+            return ''
+        symbol = symbol.strip().upper()
+        for suffix in ['.NS', '.BO', '.BSE']:
+            if symbol.endswith(suffix):
+                return symbol[:-len(suffix)]
+        return symbol
+
+    def resolve_stock_symbol(self, symbol_or_name: str) -> Optional[str]:
+        """Resolve a stock symbol using the loaded equity dataset."""
+        if not symbol_or_name or not isinstance(symbol_or_name, str):
+            return None
+
+        symbol_or_name = symbol_or_name.strip().upper()
+        # If the input already contains a suffix, normalize it first
+        normalized_symbol = self.normalize_symbol(symbol_or_name)
+
+        # Try exact symbol lookup
+        stock = self.get_stock_by_symbol(normalized_symbol)
+        if stock is not None:
+            exchange = stock.get('EXCHANGE', 'NSE')
+            suffix = '.NS' if exchange == 'NSE' else '.BO'
+            return f"{normalized_symbol}{suffix}"
+
+        # Try company name lookup
+        stock = self.get_stock_by_name(symbol_or_name)
+        if stock is not None:
+            exchange = stock.get('EXCHANGE', 'NSE')
+            symbol = self.normalize_symbol(stock.get('SYMBOL', ''))
+            suffix = '.NS' if exchange == 'NSE' else '.BO'
+            return f"{symbol}{suffix}"
+
+        # If not found in local dataset, return raw symbol with default NSE suffix when missing
+        if symbol_or_name.endswith(('.NS', '.BO', '.BSE')):
+            return symbol_or_name
+        return f"{normalized_symbol}.NS"
+
     def get_stock_by_symbol(self, symbol: str) -> Optional[Dict]:
         """Get stock data by symbol"""
-        symbol = symbol.upper().strip()
+        symbol = self.normalize_symbol(symbol)
         return self.symbol_to_stock.get(symbol)
 
     def get_stock_by_name(self, name: str) -> Optional[Dict]:
