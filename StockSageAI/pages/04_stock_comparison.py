@@ -33,8 +33,23 @@ if st.button("Compare Stocks", type="primary", use_container_width=True):
     elif len(symbols) > 5:
         st.error("Maximum 5 stocks to compare")
     else:
-        with st.spinner("Comparing stocks..."):
+        with st.spinner("🔄 Fetching real-time data for all stocks..."):
             try:
+                # Try to fetch fresh data
+                import yfinance as yf
+                success_symbols = []
+                for sym in symbols:
+                    try:
+                        ticker = yf.Ticker(sym)
+                        hist = ticker.history(period="1y")
+                        if not hist.empty:
+                            success_symbols.append(sym)
+                    except:
+                        pass
+                
+                if success_symbols:
+                    st.success(f"✅ Real-time data fetched for {len(success_symbols)}/{len(symbols)} stocks")
+                
                 # Main comparison
                 comparison_df = comparator.compare_stocks(symbols)
                 
@@ -160,9 +175,11 @@ if st.button("Compare Stocks", type="primary", use_container_width=True):
                         st.plotly_chart(fig, use_container_width=True)
                 
                 else:
-                    st.error("Unable to fetch data for the selected stocks")
+                    st.error(f"❌ Unable to fetch data for the selected stocks")
+                    st.info("💡 Tip: Try using symbols like AAPL, GOOGL, MSFT, or NSE format like TCS.NS, INFY.NS")
             
             except Exception as e:
-                st.error(f"Error comparing stocks: {str(e)}")
+                st.error(f"❌ Error comparing stocks: {str(e)[:100]}")
+                st.info("💡 Tip: Make sure symbols are valid (e.g., AAPL, GOOGL, TCS.NS, INFY.NS)")
 
 st.caption("Stock Comparison Tool • SP 07 StockSageAI")

@@ -140,7 +140,11 @@ with tab1:
                             file_name=f"{report_type}_report_{datetime.now().strftime('%Y%m%d')}.json",
                             mime="application/json"
                         )
-                        st.code(json_str[:500] + "...", language="json")
+                        # Display code safely with proper truncation
+                        preview_json = json_str[:500]
+                        if len(json_str) > 500:
+                            preview_json = preview_json + "\n\n... (report continues) ...\n}"
+                        st.code(preview_json, language="json")
                     
                     elif export_format == "csv":
                         # Convert first section to CSV

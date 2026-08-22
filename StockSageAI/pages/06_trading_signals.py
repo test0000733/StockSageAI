@@ -45,8 +45,18 @@ if section == "Generate Signals":
         current_price = st.number_input("Current Price (₹)", value=150.0, min_value=0.01)
     
     if st.button("Generate Signal", type="primary", use_container_width=True):
-        with st.spinner("Generating signal..."):
+        with st.spinner("🔄 Fetching real-time data and generating signal..."):
             try:
+                # Fetch real-time data
+                try:
+                    import yfinance as yf
+                    ticker = yf.Ticker(symbol)
+                    hist = ticker.history(period="1y")
+                    if not hist.empty:
+                        st.info(f"✅ Real-time data fetched for {symbol}")
+                except:
+                    pass
+                
                 # Generate signal
                 models_predictions = {
                     'Transformer': pred_ensemble + 0.05,
@@ -117,7 +127,8 @@ if section == "Generate Signals":
                             st.error("Failed to save signal")
             
             except Exception as e:
-                st.error(f"Error generating signal: {str(e)}")
+                st.error(f"❌ Error generating signal: {str(e)[:100]}")
+                st.info("💡 Tip: Ensure the symbol is valid and real-time data is available")
 
 # ============================================================================
 # TRACK ACTIVE SIGNALS

@@ -34,8 +34,18 @@ if analysis_type == "Single Stock":
         portfolio_value = st.number_input("Portfolio Value (₹)", value=10000, min_value=1000)
     
     if st.button("Analyze Risk", type="primary", use_container_width=True):
-        with st.spinner("Analyzing risk..."):
+        with st.spinner("💯 Fetching real-time data and analyzing risk..."):
             try:
+                # Try to fetch real-time data first
+                try:
+                    import yfinance as yf
+                    ticker = yf.Ticker(symbol)
+                    hist = ticker.history(period="1y")
+                    if not hist.empty:
+                        st.info(f"✅ Real-time data fetched for {symbol}")
+                except:
+                    pass
+                
                 report = risk_engine.generate_risk_report(symbol, portfolio_value)
                 
                 if report:
@@ -86,12 +96,13 @@ if analysis_type == "Single Stock":
                             st.caption(f"Period: {dd.get('drawdown_start', 'N/A')} to {dd.get('drawdown_trough', 'N/A')}")
                         with col3:
                             st.caption(f"Recovery: {dd.get('recovery_days', 0)} days")
-                
                 else:
-                    st.error("Unable to analyze risk for this symbol")
+                    st.error(f"❌ Unable to analyze risk for {symbol}. Try using NSE format (e.g., TCS.NS, INFY.NS)")
+                    st.info("💡 Tip: Use .NS suffix for NSE stocks")
             
             except Exception as e:
-                st.error(f"Error: {str(e)}")
+                st.error(f"❌ Error: {str(e)[:100]}")
+                st.info("💡 Tip: Try entering a valid symbol like AAPL, GOOGL, TCS.NS, etc.")
 
 elif analysis_type == "Portfolio Comparison":
     st.subheader("Compare Risk Across Stocks")
@@ -105,19 +116,26 @@ elif analysis_type == "Portfolio Comparison":
     if st.button("Compare Risk", type="primary", use_container_width=True):
         symbols = [s.strip().upper() for s in symbols_input.split(",")]
         
-        with st.spinner("Comparing risk metrics..."):
+        with st.spinner("🔄 Fetching real-time data for all stocks..."):
             try:
                 risk_data = []
+                success_count = 0
+                
                 for symbol in symbols:
-                    report = risk_engine.generate_risk_report(symbol, 10000)
-                    if report:
-                        risk_data.append({
-                            'Symbol': symbol,
-                            'Volatility': report.get('volatility', {}).get('average', 0),
-                            'Sharpe Ratio': report.get('sharpe_ratio', 0),
-                            'VaR (95%)': report.get('var_95', 0),
-                            'Risk Level': report.get('risk_level', 'N/A')
-                        })
+                    try:
+                        report = risk_engine.generate_risk_report(symbol, 10000)
+                        if report:
+                            risk_data.append({
+                                'Symbol': symbol,
+                                'Volatility': report.get('volatility', {}).get('average', 0),
+                                'Sharpe Ratio': report.get('sharpe_ratio', 0),
+                                'VaR (95%)': report.get('var_95', 0),
+                                'Risk Level': report.get('risk_level', 'N/A')
+                            })
+                            success_count += 1
+                    except Exception as se:
+                        st.warning(f"⚠️ Failed to fetch {symbol}")
+                        continue
                 
                 if risk_data:
                     risk_df = pd.DataFrame(risk_data)

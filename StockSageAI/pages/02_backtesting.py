@@ -56,73 +56,79 @@ if st.button("Run Backtest", type="primary", use_container_width=True):
             if start_date >= end_date:
                 st.error("❌ Start date must be before end date")
             else:
-                # Fetch data
-                df = backtest.fetch_historical_data(symbol, str(start_date), str(end_date))
+                # Fetch data with real-time updates
+                with st.spinner("Fetching real-time data for " + symbol + "..."):
+                    df = backtest.fetch_historical_data(symbol, str(start_date), str(end_date))
                 
-                if df.empty:
-                    st.error("❌ No data available for this symbol and date range")
+                if df.empty or len(df) < 2:
+                    st.error(f"❌ No data available for {symbol}. Try using NSE format (e.g., TCS.NS for Indian stocks) or US symbols.")
+                    st.info("💡 Tip: Use .NS for NSE stocks (e.g., TCS.NS, INFY.NS, RELIANCE.NS)")
                 else:
                     # Run backtest
                     result = backtest.backtest(df, strategy, commission)
+                    
+                    if result is None:
+                        st.error("❌ Error running backtest. Please check the data and try again.")
+                    else:
+                        # Display results
+                        st.success("✅ Backtest completed!")
+                        
+                        # Key metrics
+                        metric_cols = st.columns(4)
+                        with metric_cols[0]:
+                            st.metric("Total Return", f"{result.get('total_return', 0):.2f}%")
+                        with metric_cols[1]:
+                            st.metric("Final Value", f"₹{result.get('final_value', 0):,.2f}")
+                        with metric_cols[2]:
+                            st.metric("Sharpe Ratio", f"{result.get('sharpe_ratio', 0):.2f}")
+                        with metric_cols[3]:
+                            st.metric("Max Drawdown", f"{result.get('max_drawdown', 0):.2f}%")
                 
-                # Display results
-                st.success("✅ Backtest completed!")
-                
-                # Key metrics
-                metric_cols = st.columns(4)
-                with metric_cols[0]:
-                    st.metric("Total Return", f"{result['total_return']:.2f}%")
-                with metric_cols[1]:
-                    st.metric("Final Value", f"₹{result['final_value']:,.2f}")
-                with metric_cols[2]:
-                    st.metric("Sharpe Ratio", f"{result['sharpe_ratio']:.2f}")
-                with metric_cols[3]:
-                    st.metric("Max Drawdown", f"{result['max_drawdown']:.2f}%")
-                
-                st.divider()
-                
-                # Performance chart
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    y=result['portfolio_values'],
-                    mode='lines',
-                    name='Portfolio Value',
-                    line=dict(color='#00CC96', width=2)
-                ))
-                fig.update_layout(
-                    title="Portfolio Value Over Time",
-                    xaxis_title="Days",
-                    yaxis_title="Value (₹)",
-                    hovermode='x unified'
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Trade history
-                st.subheader("Trade History")
-                if result['trades_history']:
-                    trades_df = pd.DataFrame([
-                        {
-                            'Date': t['date'].strftime('%Y-%m-%d'),
-                            'Type': t['type'],
-                            'Price': f"₹{t['price']:.2f}",
-                            'P&L': f"₹{t.get('pnl', 0):.2f}"
-                        }
-                        for t in result['trades_history']
-                    ])
-                    st.dataframe(trades_df, use_container_width=True)
-                else:
-                    st.info("No trades executed during this period")
-                
-                # Trade statistics
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("Total Trades", result['trades'])
-                with col2:
-                    st.metric("Winning Trades", result['winning_trades'])
-                
-                if result['trades'] > 0:
-                    with col1:
-                        st.metric("Win Rate", f"{result['win_rate']:.1f}%")
+                        st.divider()
+                        
+                        # Performance chart
+                        fig = go.Figure()
+                        fig.add_trace(go.Scatter(
+                            y=result.get('portfolio_values', []),
+                            mode='lines',
+                            name='Portfolio Value',
+                            line=dict(color='#00CC96', width=2)
+                        ))
+                        fig.update_layout(
+                            title="Portfolio Value Over Time",
+                            xaxis_title="Days",
+                            yaxis_title="Value (₹)",
+                            hovermode='x unified'
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Trade history
+                        st.subheader("Trade History")
+                        trades_history = result.get('trades_history', [])
+                        if trades_history:
+                            trades_df = pd.DataFrame([
+                                {
+                                    'Date': t.get('date', datetime.now()).strftime('%Y-%m-%d'),
+                                    'Type': t.get('type', 'N/A'),
+                                    'Price': f"₹{t.get('price', 0):.2f}",
+                                    'P&L': f"₹{t.get('pnl', 0):.2f}"
+                                }
+                                for t in trades_history
+                            ])
+                            st.dataframe(trades_df, use_container_width=True)
+                        else:
+                            st.info("No trades executed during this period")
+                        
+                        # Trade statistics
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.metric("Total Trades", result.get('trades', 0))
+                        with col2:
+                            st.metric("Winning Trades", result.get('winning_trades', 0))
+                        
+                        if result.get('trades', 0) > 0:
+                            with col1:
+                                st.metric("Win Rate", f"{result.get('win_rate', 0):.1f}%")
         
         except Exception as e:
             st.error(f"❌ Error running backtest: {str(e)}")

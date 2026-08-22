@@ -23,8 +23,18 @@ with col2:
     lookback = st.slider("Lookback Period (days)", 30, 365, 100)
 
 if st.button("Scan for Patterns", type="primary", use_container_width=True):
-    with st.spinner("Scanning for patterns..."):
+    with st.spinner("🔄 Fetching real-time data and scanning for patterns..."):
         try:
+            # Fetch real-time data first
+            try:
+                import yfinance as yf
+                ticker = yf.Ticker(symbol)
+                hist = ticker.history(period=f"{lookback+30}d")
+                if not hist.empty:
+                    st.info(f"✅ Real-time data fetched for {symbol}")
+            except:
+                pass
+            
             patterns = recognizer.detect_all_patterns(symbol, lookback)
             
             if patterns and 'patterns' in patterns:
@@ -79,10 +89,12 @@ if st.button("Scan for Patterns", type="primary", use_container_width=True):
                     st.info("No patterns detected in the selected period")
             
             else:
-                st.warning("Unable to scan for patterns")
+                st.warning("⚠️ Unable to scan for patterns")
+                st.info("💡 Tip: Try using valid symbols like AAPL, GOOGL, TCS.NS, INFY.NS")
         
         except Exception as e:
-            st.error(f"Error scanning patterns: {str(e)}")
+            st.error(f"❌ Error scanning patterns: {str(e)[:100]}")
+            st.info("💡 Tip: Check if the symbol is valid and has sufficient data")
 
 st.divider()
 

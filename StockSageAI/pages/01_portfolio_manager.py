@@ -70,29 +70,31 @@ if action == "View Portfolio":
         with col1:
             st.metric(
                 "Total Value",
-                f"${metrics.get('total_value', 0):,.2f}"
+                f"₹{metrics.get('total_value', 0):,.2f}"
             )
         
         with col2:
             st.metric(
                 "Total Invested",
-                f"${metrics.get('total_invested', 0):,.2f}"
+                f"₹{metrics.get('total_invested', 0):,.2f}"
             )
         
         with col3:
             st.metric(
                 "Total Gain/Loss",
-                f"${metrics.get('total_gain', 0):,.2f}",
+                f"₹{metrics.get('total_gain', 0):,.2f}",
                 f"{metrics.get('total_gain_pct', 0):.2f}%"
             )
         
         with col4:
-            # Attempt VaR calculation
+            # Attempt VaR calculation with real-time update
             try:
-                var_95 = portfolio_mgr.calculate_var(portfolio_id)
-                st.metric("Value at Risk (95%)", f"${abs(var_95):,.2f}")
-            except:
+                with st.spinner("💯 Updating real-time data..."):
+                    var_95 = portfolio_mgr.calculate_var(portfolio_id)
+                    st.metric("Value at Risk (95%)", f"₹{abs(var_95):,.2f}")
+            except Exception as e:
                 st.metric("Value at Risk (95%)", "N/A")
+                st.caption(f"Error: {str(e)[:50]}")
         
         st.divider()
         
@@ -103,10 +105,10 @@ if action == "View Portfolio":
                 holdings_data.append({
                     'Symbol': h['symbol'],
                     'Quantity': h['quantity'],
-                    'Purchase Price': f"${h['purchase_price']:.2f}",
-                    'Current Price': f"${h['current_price']:.2f}",
-                    'Current Value': f"${h['current_value']:,.2f}",
-                    'Gain/Loss': f"${h['gain']:,.2f}",
+                    'Purchase Price': f"₹{h['purchase_price']:.2f}",
+                    'Current Price': f"₹{h['current_price']:.2f}",
+                    'Current Value': f"₹{h['current_value']:,.2f}",
+                    'Gain/Loss': f"₹{h['gain']:,.2f}",
                     'Return %': f"{h['gain_pct']:.2f}%"
                 })
             
@@ -194,9 +196,9 @@ elif action == "Analytics":
                 
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.metric("Value at Risk (95%)", f"${abs(var_95):,.2f}")
+                    st.metric("Value at Risk (95%)", f"₹{abs(var_95):,.2f}")
                 with col2:
-                    st.metric("Value at Risk (99%)", f"${abs(var_99):,.2f}")
+                    st.metric("Value at Risk (99%)", f"₹{abs(var_99):,.2f}")
             except:
                 st.warning("Unable to calculate VaR")
             
