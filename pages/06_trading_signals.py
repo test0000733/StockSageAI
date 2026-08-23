@@ -5,6 +5,7 @@ Trading Signals Page
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+from StockSageAI import ui_components as ui
 
 from StockSageAI.trading_signals import get_trading_signals_generator
 

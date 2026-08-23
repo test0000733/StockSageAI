@@ -1,5 +1,5 @@
 """
-Portfolio Management Page
+Portfolio Management Page - Enhanced UI/UX
 """
 
 import streamlit as st
@@ -7,21 +7,31 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
+from StockSageAI import ui_components as ui
 
 # Import portfolio manager
 from StockSageAI.portfolio_manager import get_portfolio_manager
 
 st.set_page_config(page_title="Portfolio Manager", layout="wide")
 
-st.markdown("# 💼 Portfolio Management System")
-st.markdown("Track and manage your stock portfolio with real-time P&L and analysis")
+# Enhanced header styling
+st.markdown("""
+<div style='text-align: center; margin-bottom: 2rem;'>
+    <h1 style='margin: 0.5rem 0;'>💼 Portfolio Management System</h1>
+    <p style='color: #cbd5e1; margin: 0.5rem 0;'>Track and manage your stock portfolio with real-time P&L and analysis</p>
+</div>
+""", unsafe_allow_html=True)
 
 portfolio_mgr = get_portfolio_manager()
 
-# Sidebar for actions
+# Sidebar for actions with better styling
 with st.sidebar:
-    st.subheader("Portfolio Actions")
-    action = st.radio("Select Action", ["View Portfolio", "Add Holding", "Analytics"])
+    st.markdown("### 🎯 Portfolio Actions")
+    action = st.radio(
+        "Select Action",
+        ["View Portfolio", "Add Holding", "Analytics"],
+        label_visibility="collapsed"
+    )
 
 if "user" not in st.session_state or not st.session_state.user:
     st.warning("⚠️ Please log in to access portfolio features")
@@ -34,23 +44,27 @@ portfolio_id = portfolio_mgr.create_portfolio(user_id)
 # VIEW PORTFOLIO
 # ============================================================================
 if action == "View Portfolio":
-    st.subheader("Current Holdings")
+    st.markdown("### 📊 Current Holdings", divider="blue")
     
     holdings = portfolio_mgr.get_holdings(portfolio_id)
     
     if holdings.empty:
         st.info("📊 No holdings yet. Add your first stock to get started!")
         
+        st.markdown("")  # Spacing
+        
         with st.form("add_first_holding"):
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3 = st.columns(3, gap="medium")
             with col1:
-                symbol = st.text_input("Stock Symbol", value="AAPL")
+                    symbol = ui.input_text("Stock Symbol", key='first_symbol', placeholder="e.g., AAPL")
             with col2:
-                quantity = st.number_input("Quantity", value=10.0, min_value=0.1)
+                    quantity = ui.input_number("Quantity", key='first_qty', value=10.0, min_value=0.1)
             with col3:
-                price = st.number_input("Purchase Price", value=150.0, min_value=0.01)
+                    price = ui.input_number("Purchase Price (₹)", key='first_price', value=150.0, min_value=0.01)
             
-            if st.form_submit_button("Add First Holding", use_container_width=True):
+            st.markdown("")  # Spacing
+            
+            if st.form_submit_button("✅ Add First Holding", use_container_width=True):
                 portfolio_mgr.add_holding(
                     portfolio_id,
                     symbol,
@@ -64,90 +78,126 @@ if action == "View Portfolio":
         # Display holdings
         metrics = portfolio_mgr.calculate_portfolio_metrics(portfolio_id)
         
-        # Key metrics
-        col1, col2, col3, col4 = st.columns(4)
+        # Key metrics with improved styling
+        st.markdown("**📈 Portfolio Overview**")
+        metric_cols = st.columns(4, gap="medium")
         
-        with col1:
-            st.metric(
-                "Total Value",
-                f"${metrics.get('total_value', 0):,.2f}"
+            ui.render_metric_card("Total Value", f"₹{metrics.get('total_value', 0):,.2f}")
             )
         
-        with col2:
-            st.metric(
-                "Total Invested",
-                f"${metrics.get('total_invested', 0):,.2f}"
+            ui.render_metric_card("Total Invested", f"₹{metrics.get('total_invested', 0):,.2f}")
             )
         
-        with col3:
-            st.metric(
-                "Total Gain/Loss",
-                f"${metrics.get('total_gain', 0):,.2f}",
-                f"{metrics.get('total_gain_pct', 0):.2f}%"
+        with metric_cols[2]:
+            gain = metrics.get('total_gain', 0)
+            ui.render_metric_card("Total Gain/Loss", f"₹{gain:,.2f}", delta=f"{gain_pct:.2f}%", trend=("up" if gain>=0 else "down"))
             )
         
-        with col4:
-            # Attempt VaR calculation
+        with metric_cols[3]:
             try:
-                var_95 = portfolio_mgr.calculate_var(portfolio_id)
-                st.metric("Value at Risk (95%)", f"${abs(var_95):,.2f}")
-            except:
+                ui.render_metric_card("Value at Risk (95%)", f"₹{abs(var_95):,.2f}")
+                )
+                ui.render_metric_card("Value at Risk (95%)", "N/A")
                 st.metric("Value at Risk (95%)", "N/A")
         
+        st.markdown("")  # Spacing
         st.divider()
+        st.markdown("")  # Spacing
         
-        # Holdings table
+        # Holdings table with better formatting
+        st.markdown("**📋 Holdings Details**")
         if 'holdings' in metrics:
             holdings_data = []
             for h in metrics['holdings']:
                 holdings_data.append({
                     'Symbol': h['symbol'],
-                    'Quantity': h['quantity'],
-                    'Purchase Price': f"${h['purchase_price']:.2f}",
-                    'Current Price': f"${h['current_price']:.2f}",
-                    'Current Value': f"${h['current_value']:,.2f}",
-                    'Gain/Loss': f"${h['gain']:,.2f}",
-                    'Return %': f"{h['gain_pct']:.2f}%"
+                    'Quantity': f"{h['quantity']:.2f}",
+                    'Purchase Price': f"₹{h['purchase_price']:.2f}",
+                    'Current Price': f"₹{h['current_price']:.2f}",
+                    'Current Value': f"₹{h['current_value']:,.2f}",
+                    'Gain/Loss': f"₹{h['gain']:,.2f}",
+                    'Return %': f"{h['gain_pct']:.2f}%",
+                    '% of Portfolio': f"{(h['current_value']/metrics.get('total_value', 1)*100):.1f}%"
                 })
             
             st.dataframe(pd.DataFrame(holdings_data), use_container_width=True)
             
-            # Pie chart of diversification
-            if 'diversification' in metrics:
-                fig = go.Figure(data=[go.Pie(
-                    labels=[d['symbol'] for d in metrics['diversification']],
-                    values=[d['weight'] * 100 for d in metrics['diversification']],
-                    hole=0.3
-                )])
-                fig.update_layout(title="Portfolio Diversification")
-                st.plotly_chart(fig, use_container_width=True)
+            st.markdown("")  # Spacing
+            
+            # Diversification chart
+            if 'diversification' in metrics and len(metrics['diversification']) > 0:
+                col1, col2 = st.columns([2, 3], gap="large")
+                
+                with col1:
+                    st.markdown("**🎯 Diversification**")
+                    div_data = pd.DataFrame([
+                        {'Symbol': d['symbol'], 'Weight %': d['weight'] * 100}
+                        for d in metrics['diversification']
+                    ])
+                    st.dataframe(div_data, use_container_width=True, hide_index=True)
+                
+                with col2:
+                    fig = go.Figure(data=[go.Pie(
+                        labels=[d['symbol'] for d in metrics['diversification']],
+                        values=[d['weight'] * 100 for d in metrics['diversification']],
+                        hole=0.35,
+                        marker=dict(colors=['#38bdf8', '#a855f7', '#10b981', '#f59e0b', '#ef4444'])
+                    )])
+                    fig.update_layout(
+                        title="Portfolio Composition",
+                        height=400,
+                        showlegend=True
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            st.markdown("")  # Spacing
 
 # ============================================================================
 # ADD HOLDING
 # ============================================================================
 elif action == "Add Holding":
-    st.subheader("Add New Holding")
+    st.markdown("### ➕ Add New Holding", divider="green")
+    
+    st.markdown("")  # Spacing
     
     with st.form("add_holding_form"):
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns(2, gap="medium")
         
         with col1:
-            symbol = st.text_input("Stock Symbol", placeholder="e.g., AAPL", max_chars=10).upper()
-            quantity = st.number_input("Number of Shares", value=10.0, min_value=0.1)
+            symbol = st.text_input(
+                "Stock Symbol",
+                placeholder="e.g., AAPL, TCS, INFY",
+                max_chars=10
+            ).upper()
+            quantity = st.number_input(
+                "Number of Shares",
+                value=10.0,
+                min_value=0.1,
+                step=0.1
+            )
         
         with col2:
-            price = st.number_input("Purchase Price per Share (₹)", value=100.0, min_value=0.01)
+            price = st.number_input(
+                "Purchase Price per Share (₹)",
+                value=100.0,
+                min_value=0.01,
+                step=0.01
+            )
             date = st.date_input("Purchase Date")
         
-        if st.form_submit_button("Add to Portfolio", use_container_width=True):
-            if symbol:
-                success = portfolio_mgr.add_holding(
-                    portfolio_id,
-                    symbol,
-                    quantity,
-                    price,
-                    str(date)
-                )
+        st.markdown("")  # Spacing
+        
+        col_btn, col_info = st.columns([2, 3], gap="medium")
+        with col_btn:
+            if st.form_submit_button("✅ Add to Portfolio", use_container_width=True):
+                if symbol:
+                    success = portfolio_mgr.add_holding(
+                        portfolio_id,
+                        symbol,
+                        quantity,
+                        price,
+                        str(date)
+                    )
                 
                 if success:
                     st.success(f"✅ Successfully added {quantity} shares of {symbol}")

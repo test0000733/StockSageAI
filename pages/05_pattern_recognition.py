@@ -4,6 +4,7 @@ Pattern Recognition Page
 
 import streamlit as st
 import pandas as pd
+from StockSageAI import ui_components as ui
 
 from StockSageAI.pattern_recognition import get_pattern_recognizer
 

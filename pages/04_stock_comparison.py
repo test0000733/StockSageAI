@@ -6,6 +6,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+from StockSageAI import ui_components as ui
 
 from StockSageAI.stock_comparator import get_stock_comparator
 

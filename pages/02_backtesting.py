@@ -5,6 +5,7 @@ Backtesting Engine Page
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+from StockSageAI import ui_components as ui
 from datetime import datetime, timedelta
 
 from StockSageAI.backtesting_engine import get_backtest_engine
