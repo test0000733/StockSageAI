@@ -6,23 +6,31 @@ import streamlit as st
 import pandas as pd
 
 from StockSageAI.pattern_recognition import get_pattern_recognizer
+from StockSageAI.stocks_database import get_stocks_database, render_stock_selector
+from StockSageAI.stocks_database import get_stocks_database, render_stock_selector
 
 st.set_page_config(page_title="Pattern Recognition", layout="wide")
 
 st.markdown("# 🔍 Candlestick Pattern Recognition")
-st.markdown("Automatic detection of 10+ technical patterns with probability scoring")
+st.markdown("### Automatic detection of 10+ technical patterns with probability scoring")
 
 recognizer = get_pattern_recognizer()
+stocks_db = get_stocks_database()
+stocks_db = get_stocks_database()
 
-col1, col2 = st.columns(2)
+# Enhanced layout
+col1, col2, col3 = st.columns(3)
 
 with col1:
-    symbol = st.text_input("Stock Symbol", value="AAPL", max_chars=10).upper()
+    symbol = render_stock_selector("Stock Symbol", default_value="AAPL", key="pattern_symbol")
 
 with col2:
-    lookback = st.slider("Lookback Period (days)", 30, 365, 100)
+    lookback = st.slider("📅 Lookback Period (days)", 30, 365, 100, 10)
 
-if st.button("Scan for Patterns", type="primary", use_container_width=True):
+with col3:
+    confidence_threshold = st.slider("🎯 Confidence Threshold (%)", 50, 100, 75, 5)
+
+if st.button("Scan for Patterns", type="primary"):
     with st.spinner("🔄 Fetching real-time data and scanning for patterns..."):
         try:
             # Fetch real-time data first
@@ -132,7 +140,7 @@ if st.button("Get Pattern Statistics", key="stats"):
                     st.write("**Most Frequent Patterns (12-Month Period):**")
                     
                     pattern_df = pd.DataFrame(top_patterns, columns=['Pattern', 'Occurrences'])
-                    st.dataframe(pattern_df, use_container_width=True)
+                    st.dataframe(pattern_df)
         
         except Exception as e:
             st.error(f"Error calculating statistics: {str(e)}")

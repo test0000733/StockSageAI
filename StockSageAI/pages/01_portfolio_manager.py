@@ -8,20 +8,47 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
 
-# Import portfolio manager
+# Import portfolio manager and stocks database
 from StockSageAI.portfolio_manager import get_portfolio_manager
+from StockSageAI.stocks_database import get_stocks_database, render_stock_selector, display_stock_info_card
 
 st.set_page_config(page_title="Portfolio Manager", layout="wide")
 
+# Custom styling
+st.markdown("""
+<style>
+    .portfolio-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+        border-radius: 10px;
+        color: white;
+        margin-bottom: 20px;
+    }
+    .metric-card {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        padding: 15px;
+        border-radius: 10px;
+        color: white;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown("# 💼 Portfolio Management System")
-st.markdown("Track and manage your stock portfolio with real-time P&L and analysis")
+st.markdown("### Track and manage your stock portfolio with real-time P&L and analysis")
 
 portfolio_mgr = get_portfolio_manager()
+stocks_db = get_stocks_database()
 
-# Sidebar for actions
+# Sidebar for actions with enhanced design
 with st.sidebar:
-    st.subheader("Portfolio Actions")
-    action = st.radio("Select Action", ["View Portfolio", "Add Holding", "Analytics"])
+    st.markdown("### 📊 Portfolio Control Center")
+    st.divider()
+    
+    action = st.radio(
+        "Select Action",
+        ["View Portfolio", "Add Holding", "Analytics"],
+        captions=["📈 View Holdings", "➕ Add Stock", "📊 Analyze"]
+    )
 
 if "user" not in st.session_state or not st.session_state.user:
     st.warning("⚠️ Please log in to access portfolio features")
@@ -37,20 +64,22 @@ if action == "View Portfolio":
     st.subheader("Current Holdings")
     
     holdings = portfolio_mgr.get_holdings(portfolio_id)
-    
-    if holdings.empty:
-        st.info("📊 No holdings yet. Add your first stock to get started!")
+
+    if holdings is None or (hasattr(holdings, '__len__') and len(holdings) == 0):
+        # Empty portfolio - show form to add first holding
+        st.info("📊 Your portfolio is empty. Add your first stock holding!")
         
-        with st.form("add_first_holding"):
+        with st.form("first_holding_form"):
             col1, col2, col3 = st.columns(3)
+            
             with col1:
-                symbol = st.text_input("Stock Symbol", value="AAPL")
+                symbol = render_stock_selector("Stock Symbol", default_value="AAPL", key="first_holding")
             with col2:
                 quantity = st.number_input("Quantity", value=10.0, min_value=0.1)
             with col3:
-                price = st.number_input("Purchase Price", value=150.0, min_value=0.01)
+                price = st.number_input("Purchase Price (₹)", value=150.0, min_value=0.01)
             
-            if st.form_submit_button("Add First Holding", use_container_width=True):
+            if st.form_submit_button("✅ Add First Holding"):
                 portfolio_mgr.add_holding(
                     portfolio_id,
                     symbol,
@@ -112,7 +141,7 @@ if action == "View Portfolio":
                     'Return %': f"{h['gain_pct']:.2f}%"
                 })
             
-            st.dataframe(pd.DataFrame(holdings_data), use_container_width=True)
+            st.dataframe(pd.DataFrame(holdings_data))
             
             # Pie chart of diversification
             if 'diversification' in metrics:
@@ -122,26 +151,39 @@ if action == "View Portfolio":
                     hole=0.3
                 )])
                 fig.update_layout(title="Portfolio Diversification")
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig)
 
 # ============================================================================
 # ADD HOLDING
 # ============================================================================
 elif action == "Add Holding":
-    st.subheader("Add New Holding")
+    st.subheader("➕ Add New Holding to Portfolio")
+    
+    # Display current stocks in database
+    with st.expander("🔍 Browse Available Stocks", expanded=False):
+        col1, col2 = st.columns(2)
+        with col1:
+            market_choice = st.selectbox("Market", ["all", "us", "india"])
+        with col2:
+            st.info(f"📊 {len(stocks_db.get_all_stocks(market_choice))} stocks available")
+        
+        categories = stocks_db.get_stocks_by_category("india" if market_choice == "india" else "us")
+        for category, stocks in categories.items():
+            st.caption(f"**{category}**: {', '.join(stocks)}")
+        st.divider()
     
     with st.form("add_holding_form"):
         col1, col2 = st.columns(2)
         
         with col1:
-            symbol = st.text_input("Stock Symbol", placeholder="e.g., AAPL", max_chars=10).upper()
+            symbol = render_stock_selector("Stock Symbol", key="add_holding_symbol")
             quantity = st.number_input("Number of Shares", value=10.0, min_value=0.1)
         
         with col2:
             price = st.number_input("Purchase Price per Share (₹)", value=100.0, min_value=0.01)
             date = st.date_input("Purchase Date")
         
-        if st.form_submit_button("Add to Portfolio", use_container_width=True):
+        if st.form_submit_button("Add to Portfolio"):
             if symbol:
                 success = portfolio_mgr.add_holding(
                     portfolio_id,
@@ -184,7 +226,7 @@ elif action == "Analytics":
                         colorscale='RdBu'
                     ))
                     fig.update_layout(title="Stock Correlation Matrix")
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig)
                 except:
                     st.warning("Unable to calculate correlations")
             
@@ -221,7 +263,7 @@ elif action == "Analytics":
                     color='Return %',
                     color_continuous_scale='RdYlGn'
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig)
     
     except Exception as e:
         st.error(f"Error generating analytics: {str(e)}")

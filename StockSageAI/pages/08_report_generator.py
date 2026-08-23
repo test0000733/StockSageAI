@@ -50,7 +50,7 @@ with tab1:
     with col2:
         st.info(f"Report Type: {report_type.upper()}")
     
-    if st.button("Generate Report", type="primary", use_container_width=True):
+    if st.button("Generate Report", type="primary"):
         with st.spinner(f"Generating {report_type} report..."):
             try:
                 symbol_list = [s.strip().upper() for s in symbols.split(",")]
@@ -79,43 +79,43 @@ with tab1:
                         st.write("### Market Overview")
                         if report.get('market_overview'):
                             overview_df = pd.DataFrame([report['market_overview']])
-                            st.dataframe(overview_df, use_container_width=True)
+                            st.dataframe(overview_df)
                         
                         st.write("### Stock Analysis")
                         if report.get('stock_analysis'):
                             analysis_df = pd.DataFrame(report['stock_analysis'])
-                            st.dataframe(analysis_df, use_container_width=True)
+                            st.dataframe(analysis_df)
                         
                         st.write("### Portfolio Status")
                         if report.get('portfolio_status'):
                             status_df = pd.DataFrame([report['portfolio_status']])
-                            st.dataframe(status_df, use_container_width=True)
+                            st.dataframe(status_df)
                         
                         st.write("### Trading Signals")
                         if report.get('trading_signals'):
                             signals_df = pd.DataFrame(report['trading_signals'])
-                            st.dataframe(signals_df, use_container_width=True)
+                            st.dataframe(signals_df)
                         
                         st.write("### Risk Analysis")
                         if report.get('risk_analysis'):
                             risk_df = pd.DataFrame([report['risk_analysis']])
-                            st.dataframe(risk_df, use_container_width=True)
+                            st.dataframe(risk_df)
                     
                     else:  # weekly
                         st.write("### Weekly Performance Analysis")
                         if report.get('performance_analysis'):
                             perf_df = pd.DataFrame([report['performance_analysis']])
-                            st.dataframe(perf_df, use_container_width=True)
+                            st.dataframe(perf_df)
                         
                         st.write("### Model Accuracy Report")
                         if report.get('model_accuracy'):
                             accuracy_df = pd.DataFrame([report['model_accuracy']])
-                            st.dataframe(accuracy_df, use_container_width=True)
+                            st.dataframe(accuracy_df)
                         
                         st.write("### Sector Analysis")
                         if report.get('sector_analysis'):
                             sector_df = pd.DataFrame(report['sector_analysis'])
-                            st.dataframe(sector_df, use_container_width=True)
+                            st.dataframe(sector_df)
                         
                         st.write("### Top Recommendations")
                         if report.get('recommendations'):
@@ -251,7 +251,7 @@ with tab2:
         if enable_email:
             email = st.text_input("Email Address")
     
-    if st.button("Schedule Report", type="primary", use_container_width=True):
+    if st.button("Schedule Report", type="primary"):
         with st.spinner("Scheduling report..."):
             try:
                 symbol_list = [s.strip().upper() for s in symbols_sched.split(",")]
@@ -316,7 +316,7 @@ with tab3:
     if filter_type != "all":
         history_df = history_df[history_df['Type'].str.lower() == filter_type]
     
-    st.dataframe(history_df, use_container_width=True)
+    st.dataframe(history_df)
     
     st.divider()
     

@@ -28,7 +28,7 @@ with tab1:
     with col_refresh1:
         st.caption("🔄 Real-time monitoring active • Last updated: now")
     with col_refresh2:
-        if st.button("🔃 Refresh", use_container_width=True):
+        if st.button("🔃 Refresh"):
             st.rerun()
     
     # Real-time status metrics
@@ -74,7 +74,7 @@ with tab1:
     ]
     
     jobs_df = pd.DataFrame(active_jobs)
-    st.dataframe(jobs_df, use_container_width=True)
+    st.dataframe(jobs_df)
     
     st.divider()
     
@@ -146,7 +146,7 @@ with tab1:
     with col3:
         enable_logging = st.checkbox("Enable Detailed Logging", value=True)
     
-    if st.button("Create Job", type="primary", use_container_width=True):
+    if st.button("Create Job", type="primary"):
         with st.spinner("🔄 Creating and scheduling training job with real-time monitoring..."):
             try:
                 progress_bar = st.progress(0)
@@ -299,7 +299,7 @@ with tab2:
         height=400
     )
     
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig)
 
 # TAB 3: Drift Detection
 with tab3:
@@ -325,7 +325,7 @@ with tab3:
         ]
         
         drift_df = pd.DataFrame(models_drift)
-        st.dataframe(drift_df, use_container_width=True)
+        st.dataframe(drift_df)
     
     with col2:
         st.write("### Drift Configuration")
@@ -368,7 +368,7 @@ with tab3:
     ]
     
     alerts_df = pd.DataFrame(alerts_data)
-    st.dataframe(alerts_df, use_container_width=True)
+    st.dataframe(alerts_df)
     
     st.divider()
     
@@ -450,15 +450,15 @@ with tab4:
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("💾 Save Settings", type="primary", use_container_width=True):
+        if st.button("💾 Save Settings", type="primary"):
             st.success("Settings saved successfully")
     
     with col2:
-        if st.button("🔄 Reset to Defaults", use_container_width=True):
+        if st.button("🔄 Reset to Defaults"):
             st.warning("Settings reset to default values")
     
     with col3:
-        if st.button("📋 Export Config", use_container_width=True):
+        if st.button("📋 Export Config"):
             config_json = {
                 "max_cpu_usage": max_cpu,
                 "max_memory_gb": max_memory,

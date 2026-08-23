@@ -8,32 +8,37 @@ import plotly.graph_objects as go
 import plotly.express as px
 
 from StockSageAI.risk_analytics import get_risk_analytics_engine
+from StockSageAI.stocks_database import get_stocks_database, render_stock_selector, render_stock_multi_selector
 
 st.set_page_config(page_title="Risk Analytics", layout="wide")
 
 st.markdown("# ⚠️ Advanced Risk Analytics")
-st.markdown("VaR, correlation, volatility, beta, and alpha analysis")
+st.markdown("### VaR, correlation, volatility, beta, and alpha analysis")
 
 risk_engine = get_risk_analytics_engine()
+stocks_db = get_stocks_database()
 
 # Sidebar
 with st.sidebar:
-    st.subheader("Risk Analysis")
+    st.markdown("### 📊 Risk Analysis Control")
+    st.divider()
+    
     analysis_type = st.radio(
         "Select Analysis",
-        ["Single Stock", "Portfolio Comparison", "Correlation Matrix"]
+        ["Single Stock", "Portfolio Comparison", "Correlation Matrix"],
+        captions=["📈 Individual", "⚖️ Multiple", "🔗 Correlation"]
     )
 
 if analysis_type == "Single Stock":
-    st.subheader("Individual Stock Risk Analysis")
+    st.subheader("📈 Individual Stock Risk Analysis")
     
     col1, col2 = st.columns(2)
     with col1:
-        symbol = st.text_input("Stock Symbol", value="AAPL", max_chars=10).upper()
+        symbol = render_stock_selector("Stock Symbol", default_value="AAPL", key="risk_single_symbol")
     with col2:
-        portfolio_value = st.number_input("Portfolio Value (₹)", value=10000, min_value=1000)
+        portfolio_value = st.number_input("Portfolio Value (₹)", value=100000, min_value=1000, step=10000)
     
-    if st.button("Analyze Risk", type="primary", use_container_width=True):
+    if st.button("Analyze Risk", type="primary"):
         with st.spinner("💯 Fetching real-time data and analyzing risk..."):
             try:
                 # Try to fetch real-time data first
@@ -73,7 +78,7 @@ if analysis_type == "Single Stock":
                         })
                         col1, col2 = st.columns([2, 1])
                         with col1:
-                            st.dataframe(vol_df, use_container_width=True)
+                            st.dataframe(vol_df)
                     
                     # Beta & Alpha
                     ba = report.get('beta_alpha', {})
@@ -105,17 +110,16 @@ if analysis_type == "Single Stock":
                 st.info("💡 Tip: Try entering a valid symbol like AAPL, GOOGL, TCS.NS, etc.")
 
 elif analysis_type == "Portfolio Comparison":
-    st.subheader("Compare Risk Across Stocks")
+    st.subheader("⚖️ Compare Risk Across Multiple Stocks")
     
-    symbols_input = st.text_input(
-        "Enter Stock Symbols (comma-separated)",
-        value="AAPL, GOOGL, MSFT",
-        placeholder="e.g., AAPL, GOOGL, MSFT"
+    symbols = render_stock_multi_selector(
+        "Select Stocks for Comparison",
+        default_values=["AAPL", "GOOGL", "MSFT"],
+        max_items=5,
+        key="risk_compare_symbols"
     )
     
-    if st.button("Compare Risk", type="primary", use_container_width=True):
-        symbols = [s.strip().upper() for s in symbols_input.split(",")]
-        
+    if st.button("Compare Risk Profiles", type="primary"):
         with st.spinner("🔄 Fetching real-time data for all stocks..."):
             try:
                 risk_data = []
@@ -139,39 +143,38 @@ elif analysis_type == "Portfolio Comparison":
                 
                 if risk_data:
                     risk_df = pd.DataFrame(risk_data)
-                    st.dataframe(risk_df, use_container_width=True)
+                    st.dataframe(risk_df)
                     
                     # Volatility comparison
                     fig = px.bar(risk_df, x='Symbol', y='Volatility', title="Volatility Comparison")
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig)
                     
                     # Risk level visualization
                     fig = px.scatter(risk_df, x='Volatility', y='Sharpe Ratio', text='Symbol', title="Risk-Return Profile")
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig)
             
             except Exception as e:
                 st.error(f"Error: {str(e)}")
 
 elif analysis_type == "Correlation Matrix":
     st.subheader("Correlation Analysis")
-    
-    symbols_input = st.text_input(
-        "Stocks for Correlation (comma-separated)",
-        value="AAPL, GOOGL, MSFT, AMZN",
-        placeholder="e.g., AAPL, GOOGL, MSFT, AMZN"
+
+    symbols = render_stock_multi_selector(
+        "Stocks for Correlation Analysis",
+        default_values=["AAPL", "GOOGL", "MSFT", "AMZN"],
+        max_items=6,
+        key="risk_corr_symbols"
     )
-    
-    if st.button("Calculate Correlations", type="primary", use_container_width=True):
-        symbols = [s.strip().upper() for s in symbols_input.split(",")]
-        
-        with st.spinner("Calculating correlations..."):
+
+    if st.button("Run Correlation Analysis", type="primary"):
+        with st.spinner("🔄 Calculating correlation matrix..."):
             try:
                 corr_matrix = risk_engine.calculate_correlation_matrix(symbols, days=252)
-                
-                if not corr_matrix.empty:
+
+                if corr_matrix is not None and not corr_matrix.empty:
                     # Display correlation matrix
                     st.subheader("Correlation Matrix")
-                    
+
                     fig = go.Figure(data=go.Heatmap(
                         z=corr_matrix.values,
                         x=corr_matrix.columns,
@@ -182,11 +185,11 @@ elif analysis_type == "Correlation Matrix":
                         zmax=1
                     ))
                     fig.update_layout(title="Stock Correlation Matrix (1-Year)")
-                    st.plotly_chart(fig, use_container_width=True)
-                    
+                    st.plotly_chart(fig)
+
                     # Correlation insights
                     st.subheader("Correlation Insights")
-                    
+
                     # Find highest correlations
                     corr_pairs = []
                     for i in range(len(corr_matrix.columns)):
@@ -196,13 +199,13 @@ elif analysis_type == "Correlation Matrix":
                                 'Stock 2': corr_matrix.columns[j],
                                 'Correlation': corr_matrix.iloc[i, j]
                             })
-                    
+
                     corr_pairs = sorted(corr_pairs, key=lambda x: abs(x['Correlation']), reverse=True)
-                    
+
                     st.write("**Strongest Correlations:**")
                     for pair in corr_pairs[:min(5, len(corr_pairs))]:
                         st.write(f"• {pair['Stock 1']} - {pair['Stock 2']}: {pair['Correlation']:.2f}")
-            
+
             except Exception as e:
                 st.error(f"Error: {str(e)}")
 

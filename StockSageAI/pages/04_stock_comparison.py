@@ -8,30 +8,32 @@ import plotly.graph_objects as go
 import plotly.express as px
 
 from StockSageAI.stock_comparator import get_stock_comparator
+from StockSageAI.stocks_database import get_stocks_database, render_stock_multi_selector
 
 st.set_page_config(page_title="Stock Comparison", layout="wide")
 
 st.markdown("# 📊 Multi-Stock Comparison Tool")
-st.markdown("Compare stocks with side-by-side analysis and forecasts")
+st.markdown("### Compare stocks with side-by-side analysis and forecasts")
 
 comparator = get_stock_comparator()
+stocks_db = get_stocks_database()
 
-# Input section
-st.subheader("Select Stocks to Compare")
+# Enhanced input section
+st.subheader("🔍 Select Stocks to Compare")
 
-symbols_input = st.text_input(
-    "Enter Stock Symbols (comma-separated, max 5)",
-    value="AAPL, GOOGL, MSFT, AMZN, TSLA",
-    placeholder="e.g., AAPL, GOOGL, MSFT"
+symbols = render_stock_multi_selector(
+    "Select up to 5 stocks to compare",
+    default_values=["AAPL", "GOOGL", "MSFT"],
+    max_items=5,
+    key="comparison_symbols"
 )
 
-if st.button("Compare Stocks", type="primary", use_container_width=True):
-    symbols = [s.strip().upper() for s in symbols_input.split(",") if s.strip()]
+if st.button("📊 Compare Stocks", type="primary"):
     
     if len(symbols) == 0:
-        st.error("Please enter at least one symbol")
+        st.error("❌ Please select at least one stock")
     elif len(symbols) > 5:
-        st.error("Maximum 5 stocks to compare")
+        st.error("❌ Maximum 5 stocks allowed for comparison")
     else:
         with st.spinner("🔄 Fetching real-time data for all stocks..."):
             try:
@@ -60,8 +62,7 @@ if st.button("Compare Stocks", type="primary", use_container_width=True):
                     display_cols = ['symbol', 'name', 'price', 'pe', 'dividend', 'volatility', 'sharpe_ratio', 'change_1y']
                     if 'name' in comparison_df.columns:
                         st.dataframe(
-                            comparison_df[[c for c in display_cols if c in comparison_df.columns]],
-                            use_container_width=True
+                            comparison_df[[c for c in display_cols if c in comparison_df.columns]]
                         )
                     
                     st.divider()
@@ -81,7 +82,7 @@ if st.button("Compare Stocks", type="primary", use_container_width=True):
                             color='change_1y',
                             color_continuous_scale='RdYlGn'
                         )
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig)
                     
                     with col2:
                         # Volatility Comparison
@@ -93,7 +94,7 @@ if st.button("Compare Stocks", type="primary", use_container_width=True):
                             color='volatility',
                             color_continuous_scale='Reds'
                         )
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig)
                     
                     # P/E Ratio Comparison
                     fig = px.bar(
@@ -104,7 +105,7 @@ if st.button("Compare Stocks", type="primary", use_container_width=True):
                         color='pe',
                         color_continuous_scale='Blues'
                     )
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig)
                     
                     st.divider()
                     
@@ -125,8 +126,7 @@ if st.button("Compare Stocks", type="primary", use_container_width=True):
                         ])
                         
                         st.dataframe(
-                            strength_df.sort_values('Rank'),
-                            use_container_width=True
+                            strength_df.sort_values('Rank')
                         )
                         
                         # Strength chart
@@ -138,7 +138,7 @@ if st.button("Compare Stocks", type="primary", use_container_width=True):
                             color='Value',
                             color_continuous_scale='Viridis'
                         )
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig)
                     
                     st.divider()
                     
@@ -172,7 +172,7 @@ if st.button("Compare Stocks", type="primary", use_container_width=True):
                             zmid=0
                         ))
                         fig.update_layout(title="Stock Correlation Matrix")
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig)
                 
                 else:
                     st.error(f"❌ Unable to fetch data for the selected stocks")

@@ -7,13 +7,17 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from StockSageAI.trading_signals import get_trading_signals_generator
+from StockSageAI.stocks_database import get_stocks_database, render_stock_selector
+from StockSageAI.stocks_database import get_stocks_database, render_stock_selector
 
 st.set_page_config(page_title="Trading Signals", layout="wide")
 
 st.markdown("# 📡 Real-Time Trading Signals")
-st.markdown("Automatic Buy/Sell/Hold recommendations with confidence scores")
+st.markdown("### Automatic Buy/Sell/Hold recommendations with confidence scores")
 
+stocks_db = get_stocks_database()
 signals_gen = get_trading_signals_generator()
+stocks_db = get_stocks_database()
 
 if "user" not in st.session_state or not st.session_state.user:
     st.warning("⚠️ Please log in to access trading signals")
@@ -23,28 +27,29 @@ user_id = st.session_state.user.get("username", "guest")
 
 # Sidebar
 with st.sidebar:
-    st.subheader("Signal Generation")
-    section = st.radio("Select", ["Generate Signals", "Track Active", "Accuracy Report"])
+    st.markdown("### 📊 Trading Signal Control Center")
+    st.divider()
+    
+    section = st.radio("Select", ["Generate Signals", "Track Active", "Accuracy Report"], captions=["🆕 New", "📈 Monitor", "📊 Report"])
 
 # ============================================================================
 # GENERATE SIGNALS
 # ============================================================================
 if section == "Generate Signals":
-    st.subheader("Generate Trading Signal")
+    st.subheader("🆕 Generate Trading Signal")
     
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        symbol = st.text_input("Stock Symbol", value="AAPL", max_chars=10).upper()
+        symbol = render_stock_selector("Stock Symbol", default_value="AAPL", key="signal_symbol")
     
     with col2:
-        # Dummy model predictions
-        pred_ensemble = st.slider("Ensemble Prediction", -1.0, 1.0, 0.15)
+        pred_ensemble = st.slider("📊 Ensemble Prediction", -1.0, 1.0, 0.15, 0.05)
     
     with col3:
-        current_price = st.number_input("Current Price (₹)", value=150.0, min_value=0.01)
+        current_price = st.number_input("💰 Current Price (₹)", value=150.0, min_value=0.01)
     
-    if st.button("Generate Signal", type="primary", use_container_width=True):
+    if st.button("Generate Signal", type="primary"):
         with st.spinner("🔄 Fetching real-time data and generating signal..."):
             try:
                 # Fetch real-time data
@@ -119,7 +124,7 @@ if section == "Generate Signals":
                             st.metric("Hold Votes", votes.get('hold', 0))
                     
                     # Save signal
-                    if st.button("Save Signal", use_container_width=True):
+                    if st.button("Save Signal"):
                         signal_id = signals_gen.save_signal(user_id, signal_data)
                         if signal_id > 0:
                             st.success(f"✅ Signal saved (ID: {signal_id})")

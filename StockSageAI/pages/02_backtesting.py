@@ -8,49 +8,68 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 
 from StockSageAI.backtesting_engine import get_backtest_engine
+from StockSageAI.stocks_database import get_stocks_database, render_stock_selector
 
 st.set_page_config(page_title="Backtesting", layout="wide")
 
 st.markdown("# 📊 Advanced Backtesting Engine")
-st.markdown("Test trading strategies on historical data with comprehensive metrics")
+st.markdown("### Test trading strategies on historical data with comprehensive metrics")
 
 backtest = get_backtest_engine()
+stocks_db = get_stocks_database()
 
-st.subheader("Backtest Configuration")
+st.subheader("⚙️ Backtest Configuration")
 
+# Enhanced layout
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    symbol = st.text_input("Stock Symbol", value="AAPL", max_chars=10).upper()
+    symbol = render_stock_selector("Stock Symbol", default_value="AAPL", key="backtest_symbol")
 
 with col2:
     strategy = st.selectbox(
-        "Strategy",
+        "Trading Strategy",
         ["ma_crossover", "rsi", "bollinger_bands"],
-        format_func=lambda x: x.replace("_", " ").title()
+        format_func=lambda x: {
+            "ma_crossover": "📊 Moving Average Crossover",
+            "rsi": "📈 RSI (Relative Strength Index)",
+            "bollinger_bands": "🎀 Bollinger Bands"
+        }.get(x, x)
     )
 
 with col3:
-    initial_capital = st.number_input("Initial Capital (₹)", value=10000, min_value=1000)
+    initial_capital = st.number_input("Initial Capital (₹)", value=10000, min_value=1000, step=1000)
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
     start_date = st.date_input(
-        "Start Date",
+        "📅 Start Date",
         value=datetime.now() - timedelta(days=365)
     )
 
 with col2:
     end_date = st.date_input(
-        "End Date",
+        "📅 End Date",
         value=datetime.now()
     )
 
 with col3:
-    commission = st.slider("Commission (%)", 0.0, 1.0, 0.1) / 100
+    commission = st.slider("💰 Commission (%)", 0.0, 1.0, 0.1, 0.05) / 100
 
-if st.button("Run Backtest", type="primary", use_container_width=True):
+# Strategy info section
+with st.expander("📖 Strategy Information", expanded=False):
+    strategy_info = {
+        "ma_crossover": "Moving Average Crossover: Buy when MA(20) > MA(50), Sell when MA(20) < MA(50)",
+        "rsi": "RSI Strategy: Buy when RSI < 30 (Oversold), Sell when RSI > 70 (Overbought)",
+        "bollinger_bands": "Bollinger Bands: Buy at lower band, Sell at upper band (MA ± 2σ)"
+    }
+    st.info(strategy_info.get(strategy, "No info available"))
+
+st.divider()
+
+# Run backtest button
+if st.button("🚀 Run Backtest", type="primary"):
     with st.spinner("Running backtest..."):
         try:
             if start_date >= end_date:
@@ -100,7 +119,7 @@ if st.button("Run Backtest", type="primary", use_container_width=True):
                             yaxis_title="Value (₹)",
                             hovermode='x unified'
                         )
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig)
                         
                         # Trade history
                         st.subheader("Trade History")
@@ -115,7 +134,7 @@ if st.button("Run Backtest", type="primary", use_container_width=True):
                                 }
                                 for t in trades_history
                             ])
-                            st.dataframe(trades_df, use_container_width=True)
+                            st.dataframe(trades_df)
                         else:
                             st.info("No trades executed during this period")
                         
@@ -144,7 +163,7 @@ if st.button("Compare Strategies", key="compare"):
             comparison = backtest.compare_strategies(symbol, str(start_date), str(end_date))
             
             if not comparison.empty:
-                st.dataframe(comparison, use_container_width=True)
+                st.dataframe(comparison)
             else:
                 st.warning("Unable to compare strategies")
         except Exception as e:
