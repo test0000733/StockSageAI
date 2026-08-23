@@ -101,12 +101,18 @@ class BacktestingEngine:
         entry_price = 0
         
         for i in range(len(df)):
-            if pd.isna(df.iloc[i]['Position']):
+            # Extract scalar values to avoid Series comparison issues
+            position_val = df.iloc[i]['Position']
+            if pd.isna(position_val):
                 continue
             
+            # Ensure scalar comparison
+            position_val = float(position_val) if not pd.isna(position_val) else 0
+            close_price = float(df.iloc[i]['Close'])
+            
             # Buy signal
-            if df.iloc[i]['Position'] == 2 and position == 0:
-                entry_price = df.iloc[i]['Close']
+            if position_val == 2 and position == 0:
+                entry_price = close_price
                 position = 1
                 trades.append({
                     'date': df.index[i],
@@ -115,8 +121,8 @@ class BacktestingEngine:
                 })
             
             # Sell signal
-            elif df.iloc[i]['Position'] == -2 and position == 1:
-                exit_price = df.iloc[i]['Close']
+            elif position_val == -2 and position == 1:
+                exit_price = close_price
                 pnl = (exit_price - entry_price) * 1 - (commission * capital)
                 capital += pnl
                 trades.append({
@@ -129,7 +135,7 @@ class BacktestingEngine:
             
             # Update portfolio value
             if position == 1:
-                unrealized_pnl = (df.iloc[i]['Close'] - entry_price)
+                unrealized_pnl = (close_price - entry_price)
                 portfolio_values.append(capital + unrealized_pnl)
             else:
                 portfolio_values.append(capital)
