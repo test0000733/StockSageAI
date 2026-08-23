@@ -75,13 +75,25 @@ class BacktestingEngine:
             
         elif strategy == 'bollinger_bands':
             # Bollinger Bands Strategy
+            df = df.copy()  # Avoid SettingWithCopyWarning
             df['MA'] = df['Close'].rolling(window=20).mean()
             df['Std'] = df['Close'].rolling(window=20).std()
             df['Upper'] = df['MA'] + (df['Std'] * 2)
             df['Lower'] = df['MA'] - (df['Std'] * 2)
+            
+            # Fill NaN values properly  
+            first_close = df.iloc[0]['Close']
+            df['Upper'] = df['Upper'].ffill().fillna(first_close * 1.05)
+            df['Lower'] = df['Lower'].ffill().fillna(first_close * 0.95)
+            
             df['Signal'] = 0
-            df.loc[df['Close'] < df['Lower'], 'Signal'] = 1
-            df.loc[df['Close'] > df['Upper'], 'Signal'] = -1
+            # Use .values to avoid index alignment issues
+            close = df['Close'].values
+            upper = df['Upper'].values
+            lower = df['Lower'].values
+            
+            df.loc[close < lower, 'Signal'] = 1
+            df.loc[close > upper, 'Signal'] = -1
             df['Position'] = df['Signal'].diff()
         
         return df
@@ -101,14 +113,26 @@ class BacktestingEngine:
         entry_price = 0
         
         for i in range(len(df)):
-            # Extract scalar values to avoid Series comparison issues
-            position_val = df.iloc[i]['Position']
+            # Extract scalar values properly to avoid Series comparison issues
+            try:
+                position_val = df.iloc[i]['Position'].item() if hasattr(df.iloc[i]['Position'], 'item') else df.iloc[i]['Position']
+            except (AttributeError, TypeError):
+                position_val = df.iloc[i]['Position']
+            
+            # Check if value is NaN using proper method for scalar/Series
+            if isinstance(position_val, (list, tuple)) or (hasattr(position_val, '__len__') and not isinstance(position_val, str)):
+                position_val = position_val[0] if len(position_val) > 0 else np.nan
+            
             if pd.isna(position_val):
                 continue
             
             # Ensure scalar comparison
             position_val = float(position_val) if not pd.isna(position_val) else 0
-            close_price = float(df.iloc[i]['Close'])
+            try:
+                close_price = df.iloc[i]['Close'].item() if hasattr(df.iloc[i]['Close'], 'item') else df.iloc[i]['Close']
+            except (AttributeError, TypeError):
+                close_price = df.iloc[i]['Close']
+            close_price = float(close_price)
             
             # Buy signal
             if position_val == 2 and position == 0:
