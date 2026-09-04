@@ -66,20 +66,30 @@ def safe_rerun():
 
 
 # Initialize session state
-if 'user' not in st.session_state:
-    st.session_state.user = None
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-if 'page' not in st.session_state:
-    st.session_state.page = 'login'
-if 'pending_pin_user' not in st.session_state:
-    st.session_state.pending_pin_user = None
-if 'pending_pin_remember' not in st.session_state:
-    st.session_state.pending_pin_remember = False
-if 'pin_entry' not in st.session_state:
-    st.session_state.pin_entry = ''
-if 'pin_attempts' not in st.session_state:
-    st.session_state.pin_attempts = 0
+
+def ensure_session_state_defaults():
+    """Ensure all required session keys exist before they are accessed."""
+    defaults = {
+        'user': None,
+        'authenticated': False,
+        'page': 'login',
+        'pending_pin_user': None,
+        'pending_pin_remember': False,
+        'pin_entry': '',
+        'pin_attempts': 0,
+        'search_query': '',
+        'admin_ai_stock': '',
+        'admin_ai_selected_models': [],
+        'admin_ai_auto_run': False,
+        'admin_ai_results': None,
+        'admin_ai_refresh_counter': 0,
+        'admin_ai_model': None,
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+ensure_session_state_defaults()
 
 # Apply mobile-first responsive CSS and wide layout for better mobile rendering
 try:
@@ -88,6 +98,43 @@ except Exception:
     pass
 st.markdown(responsive_ui.MOBILE_FIRST_STYLES, unsafe_allow_html=True)
 responsive_ui.ensure_viewport_width()
+
+# Legacy fallback keys for older app versions
+for key in ['user', 'authenticated', 'page', 'pending_pin_user', 'pending_pin_remember', 'pin_entry', 'pin_attempts']:
+    if key not in st.session_state:
+        st.session_state[key] = {
+            'user': None,
+            'authenticated': False,
+            'page': 'login',
+            'pending_pin_user': None,
+            'pending_pin_remember': False,
+            'pin_entry': '',
+            'pin_attempts': 0,
+        }.get(key)
+
+# Apply mobile-first responsive CSS and wide layout for better mobile rendering
+try:
+    st.set_page_config(layout='wide', initial_sidebar_state='collapsed')
+except Exception:
+    pass
+st.markdown(responsive_ui.MOBILE_FIRST_STYLES, unsafe_allow_html=True)
+responsive_ui.ensure_viewport_width()
+
+# Legacy fallback keys for older app versions
+for key in ['user', 'authenticated', 'page', 'pending_pin_user', 'pending_pin_remember', 'pin_entry', 'pin_attempts']:
+    if key not in st.session_state:
+        st.session_state[key] = {
+            'user': None,
+            'authenticated': False,
+            'page': 'login',
+            'pending_pin_user': None,
+            'pending_pin_remember': False,
+            'pin_entry': '',
+            'pin_attempts': 0,
+        }.get(key)
+
+# Remove duplicate old block if present below by replacing the earlier block section
+# ...existing code...
 
 # Initialize commonly-used session state keys to avoid AttributeError
 defaults = {
@@ -410,31 +457,150 @@ def render_auth_loader(message='Secure Authentication in Progress...'):
 def render_auth_form_styles():
     return """
     <style>
-    .auth-container {
-        max-width: 440px;
-        margin: 1rem auto 1rem;
-        padding: 2.5rem 2rem;
-        background: rgba(15, 23, 42, 0.94);
+    body {
+        background: radial-gradient(circle at top left, rgba(124,58,237,0.19), transparent 28%),
+                    radial-gradient(circle at top right, rgba(34,211,238,0.16), transparent 30%),
+                    linear-gradient(180deg, #020817 0%, #07111f 100%);
+    }
+    .auth-shell {
+        max-width: 1180px;
+        margin: 1rem auto 0;
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 1.5rem;
+        align-items: stretch;
+    }
+    .auth-hero {
+        background: linear-gradient(135deg, rgba(17,24,39,0.96), rgba(15,23,42,0.84));
+        border: 1px solid rgba(148,163,184,0.18);
+        border-radius: 32px;
+        padding: 2rem;
+        box-shadow: 0 30px 80px rgba(15, 23, 42, 0.52);
+        position: relative;
+        overflow: hidden;
+        min-height: 560px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    .auth-hero::before {
+        content: "";
+        position: absolute;
+        width: 300px;
+        height: 300px;
+        right: -80px;
+        top: -90px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(34,211,238,0.34), rgba(34,211,238,0.02) 60%, transparent 70%);
+    }
+    .auth-hero::after {
+        content: "";
+        position: absolute;
+        width: 260px;
+        height: 260px;
+        left: -50px;
+        bottom: -70px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(168,85,247,0.34), rgba(168,85,247,0.02) 60%, transparent 70%);
+    }
+    .auth-brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        color: #c4b5fd;
+        margin-bottom: 1.5rem;
+        position: relative;
+        z-index: 1;
+    }
+    .auth-logo {
+        width: 46px;
+        height: 46px;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, rgba(124,58,237,0.95), rgba(34,211,238,0.78));
+        color: rgba(255,255,255,0.96);
+        font-weight: 800;
+        box-shadow: 0 15px 40px rgba(124, 58, 237, 0.28);
+    }
+    .auth-hero h1 {
+        position: relative;
+        z-index: 1;
+        font-size: clamp(2.5rem, 4vw, 4.1rem);
+        line-height: 0.98;
+        letter-spacing: -0.06em;
+        margin: 0;
+        background: linear-gradient(92deg, #f8fafc 0%, #7dd3fc 28%, #c4b5fd 60%, #a7f3d0 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+    }
+    .auth-hero p {
+        position: relative;
+        z-index: 1;
+        color: rgba(226, 232, 240, 0.8);
+        font-size: 1.08rem;
+        line-height: 1.7;
+        max-width: 560px;
+        margin-top: 1.1rem;
+    }
+    .auth-feature-list {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 1.7rem;
+    }
+    .auth-feature-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.65rem 1rem;
+        border-radius: 999px;
+        background: rgba(15, 118, 110, 0.12);
+        border: 1px solid rgba(45,212,191,0.18);
+        color: #d1fae5;
+        font-size: 0.82rem;
+        font-weight: 600;
+    }
+    .auth-panel {
+        max-width: 480px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 2rem 1.5rem;
+        background: rgba(15, 23, 42, 0.96);
         backdrop-filter: blur(18px);
-        border-radius: 28px;
-        border: 1px solid rgba(96, 165, 250, 0.18);
-        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.65);
+        border-radius: 32px;
+        border: 1px solid rgba(148,163,184,0.18);
+        box-shadow: 0 28px 80px rgba(15, 23, 42, 0.58);
         display: flex;
         flex-direction: column;
         gap: 1rem;
         color: #e2e8f0;
+        position: relative;
+        z-index: 1;
     }
     .auth-title {
-        font-size: 2rem;
+        font-size: clamp(1.7rem, 2vw, 2.2rem);
         font-weight: 800;
         text-align: center;
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.25rem;
+        background: linear-gradient(90deg, #f8fafc, #7dd3fc);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
     }
     .auth-caption {
         text-align: center;
-        color: rgba(226, 232, 240, 0.78);
-        font-size: 0.95rem;
-        margin-bottom: 1.25rem;
+        color: rgba(226, 232, 240, 0.8);
+        font-size: 0.96rem;
+        margin-bottom: 0.75rem;
     }
     .auth-actions {
         display: flex;
@@ -444,6 +610,8 @@ def render_auth_form_styles():
     }
     .auth-actions .stButton > button {
         min-width: 140px;
+        border-radius: 12px !important;
+        font-weight: 700;
     }
     .auth-footer {
         display: flex;
@@ -460,251 +628,47 @@ def render_auth_form_styles():
     .auth-footer a:hover {
         text-decoration: underline;
     }
+    @media (max-width: 980px) {
+        .auth-shell {
+            grid-template-columns: 1fr;
+        }
+        .auth-hero {
+            min-height: 250px;
+        }
+    }
     </style>
     """
 
 
-def render_ai_processing_loader(message='AI Forecast Engine Running...'):
-    st.markdown(render_loader_styles(), unsafe_allow_html=True)
-    st.markdown(f"""
-<div class='loader-screen'>
-  <div class='loader-panel'>
-    <div class='loader-logo'>AI</div>
-    <div class='loader-title'>Processing Intelligence</div>
-    <div class='loader-subtitle'>{message} <span style='color:#22d3ee;'>Scanning markets, processing signals, and computing predictions.</span></div>
-    <div class='loader-stripe'>
-      <div class='loader-dot'></div>
-      <div class='loader-dot'></div>
-      <div class='loader-dot'></div>
-    </div>
-    <div class='loader-progress'><div class='loader-progress-inner'></div></div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
-
-
-def render_back_button(target_page='dashboard', label='← Back', key=None):
-    key = key or f"back_{target_page}"
-    if st.button(label, key=key, width='stretch'):
-        st.session_state.page = target_page
-        st.rerun()
-
-
-def format_percentage(value):
-    try:
-        return f"{value:+.2f}%"
-    except Exception:
-        return "N/A"
-
-
-def build_market_breadth():
-    advancing = np.random.randint(45, 62)
-    declining = 100 - advancing
-    unchanged = np.random.randint(0, 4)
-    breadth = advancing - declining
-    return {
-        'advancing': advancing,
-        'declining': declining,
-        'unchanged': unchanged,
-        'breadth': breadth
-    }
-
-
-def get_realtime_sector_data():
-    """Fetch real-time sector performance data"""
-    data_fetcher = DataFetcher()
-    sectors = {
-        'Technology': '^CNXIT',
-        'Healthcare': '^CNXPHARMA',
-        'Auto': '^CNXAUTO',
-        'Energy': '^CNXENERGY',
-        'Consumer Goods': '^CNXFMCG',
-        'Banking': '^NSEBANK',
-        'Realty': '^CNXREALTY'
-    }
-
-    sector_perf = []
-    for sector_name, symbol in sectors.items():
-        try:
-            data = data_fetcher.get_index_data(symbol, period='7d')
-            if not data.empty and len(data) >= 2:
-                prev_close = data['Close'].iloc[-2]
-                latest_close = data['Close'].iloc[-1]
-                perf = ((latest_close - prev_close) / prev_close) * 100
-                status = 'Strong' if perf > 1.0 else 'Moderate' if perf >= 0 else 'Weak'
-                sector_perf.append({
-                    'Sector': sector_name,
-                    'Strength': f"{perf:+.2f}%",
-                    'Performance': perf,
-                    'Status': status
-                })
-            else:
-                sector_perf.append({'Sector': sector_name, 'Strength': '─', 'Performance': 0.0, 'Status': 'Unavailable'})
-        except Exception:
-            sector_perf.append({'Sector': sector_name, 'Strength': '─', 'Performance': 0.0, 'Status': 'Unavailable'})
-
-    sector_df = pd.DataFrame(sector_perf)
-    if not sector_df.empty:
-        sector_df = sector_df.sort_values('Performance', ascending=False).reset_index(drop=True)
-    return sector_df
-
-
-def render_fullscreen_analysis_loader():
-    """Render full-screen loader while analyzing stock"""
-    st.markdown(render_loader_styles(), unsafe_allow_html=True)
-    st.markdown("""
-<div class='loader-screen'>
-  <div class='loader-glow'></div>
-  <div class='loader-panel'>
-    <div class='loader-logo'>📊</div>
-    <div class='loader-title'>AI Stock Analysis in Progress</div>
-    <div class='loader-subtitle'>Gathering real-time market data, computing technical indicators, running LSTM forecasts, and analyzing sentiment intelligence...</div>
-    <div class='loader-stripe'>
-      <div class='loader-dot'></div>
-      <div class='loader-dot'></div>
-      <div class='loader-dot'></div>
-    </div>
-    <div class='loader-progress'>
-      <div class='loader-progress-inner'></div>
-    </div>
-    <p style='margin-top:2rem; color:#22d3ee; text-align:center; font-size:0.9rem;'>Hang tight—premium analysis engines are sifting through market data</p>
-  </div>
-</div>
-""", unsafe_allow_html=True)
-
-
-def extract_event_signals(news_headlines):
-    events = []
-    if not news_headlines:
-        return events
-
-    keywords = ['earnings', 'dividend', 'guidance', 'merger', 'acquisition', 'upgrade', 'downgrade', 'outlook', 'results', 'forecast']
-    for headline in news_headlines:
-        title = headline.get('title', '').lower()
-        date = headline.get('date', '')
-        for keyword in keywords:
-            if keyword in title:
-                events.append({'title': headline.get('title', ''), 'type': keyword.title(), 'date': date, 'source': headline.get('source', 'News')})
-                break
-    return events[:5]
-
-
-def compute_portfolio_risk_metrics(holdings):
-    metrics = {
-        'total_cost': 0.0,
-        'market_value': 0.0,
-        'unrealized_pnl': 0.0,
-        'var_95': 0.0,
-        'max_drawdown': 0.0,
-        'allocations': []
-    }
-
-    if not holdings:
-        return metrics
-
-    df = pd.DataFrame(holdings)
-    data_fetcher = DataFetcher()
-    values = []
-    returns = []
-
-    for holding in holdings:
-        symbol = holding.get('symbol', '')
-        quantity = float(holding.get('quantity', 0) or 0)
-        avg_price = float(holding.get('avg_buy_price', 0) or 0)
-        metrics['total_cost'] += quantity * avg_price
-
-        stock_data = data_fetcher.get_stock_data(symbol, period='1mo')
-        latest_price = stock_data['Close'].iloc[-1] if not stock_data.empty else avg_price
-        market_value = quantity * latest_price
-        values.append(market_value)
-
-        if not stock_data.empty and len(stock_data) > 1:
-            returns.extend(stock_data['Close'].pct_change().dropna().tolist())
-
-        metrics['allocations'].append({
-            'symbol': symbol,
-            'market_value': market_value,
-            'avg_price': avg_price,
-            'quantity': quantity
-        })
-
-    metrics['market_value'] = sum(values)
-    metrics['unrealized_pnl'] = metrics['market_value'] - metrics['total_cost']
-
-    if returns:
-        daily_std = np.std(returns)
-        metrics['var_95'] = max(0.0, min(100.0, daily_std * 1.65 * 100))
-        max_drawdown = 0.0
-        for holding in holdings:
-            symbol = holding.get('symbol', '')
-            stock_data = data_fetcher.get_stock_data(symbol, period='3mo')
-            if not stock_data.empty:
-                peak = stock_data['Close'].expanding(min_periods=1).max()
-                drawdown = ((stock_data['Close'] - peak) / peak).min() * 100
-                max_drawdown = min(max_drawdown, drawdown)
-        metrics['max_drawdown'] = abs(max_drawdown)
-
-    if metrics['market_value'] > 0:
-        for alloc in metrics['allocations']:
-            alloc['allocation_pct'] = (alloc['market_value'] / metrics['market_value']) * 100
-
-    return metrics
-
-
-# --- Authentication System ---
 def show_login_page():
-    st.markdown("""
-    <style>
-    .block-container {
-        padding-top: 1rem !important;
-    }
-    .auth-container {
-        max-width: 460px;
-        margin: 0.75rem auto 1rem;
-        padding: 2rem 1.8rem;
-        background: rgba(15, 23, 42, 0.96);
-        backdrop-filter: blur(22px);
-        border-radius: 28px;
-        border: 1px solid rgba(96, 165, 250, 0.18);
-        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.45);
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
-        color: #e2e8f0;
-    }
-    .auth-title {
-        text-align: center;
-        font-size: 2rem;
-        font-weight: 800;
-        color: #7dd3fc;
-        margin-bottom: 0.25rem;
-    }
-    .auth-caption {
-        text-align: center;
-        color: rgba(226, 232, 240, 0.78);
-        font-size: 0.95rem;
-        margin-bottom: 1.25rem;
-    }
-    .auth-actions {
-        display: flex;
-        gap: 0.75rem;
-        flex-wrap: wrap;
-        justify-content: center;
-    }
-    .auth-actions .stButton > button {
-        min-width: 140px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    st.markdown(render_auth_form_styles(), unsafe_allow_html=True)
+
+    st.markdown('<div class="auth-shell">', unsafe_allow_html=True)
+
+    st.markdown('''
+    <div class="auth-hero">
+        <div class="auth-brand"><span class="auth-logo">SS</span>StockSageAI</div>
+        <h1>Luxury AI trading intelligence.</h1>
+        <p>Unlock premium market intelligence, real-time forecasting, portfolio protection, and strategic decision support through a single advanced command center.</p>
+        <div class="auth-feature-list">
+            <span class="auth-feature-pill">• Live market signals</span>
+            <span class="auth-feature-pill">• AI confidence scoring</span>
+            <span class="auth-feature-pill">• Portfolio risk control</span>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
 
     # If a pending PIN flow exists, show the PIN entry UI immediately
     if st.session_state.get('pending_pin_user'):
+        st.markdown('<div class="auth-panel">', unsafe_allow_html=True)
         show_pin_entry_page()
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
         return
 
-    st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+    st.markdown('<div class="auth-panel">', unsafe_allow_html=True)
     st.markdown('<div class="auth-title">🔐 Login to SP 07</div>', unsafe_allow_html=True)
-    st.markdown('<div class="auth-caption">Enterprise-grade AI forecasting and market intelligence platform.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="auth-caption">Secure access to AI forecasting and market intelligence.</div>', unsafe_allow_html=True)
 
     with st.form("login_form"):
         identifier = st.text_input("Email or Username", key="login_identifier")
@@ -715,7 +679,6 @@ def show_login_page():
         with col1:
             login_submitted = st.form_submit_button("Login", width='stretch')
         with col2:
-            # Signup option removed — accounts are created by admins only
             st.markdown("<div style='height:35px;'></div>", unsafe_allow_html=True)
 
     if login_submitted:
@@ -724,28 +687,23 @@ def show_login_page():
         else:
             render_auth_loader("Validating credentials...")
             success, message, user = auth_manager.login(identifier, password, remember_me)
-            # Debug output removed from UI. Use server logs for debugging when needed.
             if success and message == "PIN required":
                 st.success("Credentials verified. Enter your 4-digit security PIN.")
                 st.session_state.pending_pin_user = user
                 st.session_state.pending_pin_remember = remember_me
-                # Render the PIN entry UI immediately to avoid navigation/rerun inconsistencies
                 show_pin_entry_page()
-                return
+                st.rerun()
             elif success:
                 st.success(message)
                 st.session_state.page = 'dashboard'
                 st.rerun()
             else:
-                # Show error and, if it's the legacy PIN message, display a prominent reset CTA
                 st.error(message)
                 if isinstance(message, str) and 'legacy format' in message.lower():
                     st.warning("Your account uses an older security PIN format. You must reset your Security PIN to continue.")
                     if st.button("Reset Security PIN Now", key="reset_pin_now"):
                         st.session_state.page = 'pin_reset_request'
                         st.rerun()
-
-    # signup_page has been removed — self-service signup disabled
 
     if st.button("Forgot Password?", key="forgot_link"):
         st.session_state.page = 'forgot_password'
@@ -756,249 +714,16 @@ def show_login_page():
         st.rerun()
 
     st.markdown('</div>', unsafe_allow_html=True)
-
-def show_signup_page():
-    st.markdown(render_auth_form_styles(), unsafe_allow_html=True)
-
-    st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-    st.markdown('<div class="auth-title">📝 Sign Up for StockSageAI</div>', unsafe_allow_html=True)
-    st.markdown('<div class="auth-caption">Create your StockSageAI account and unlock premium market insights.</div>', unsafe_allow_html=True)
-
-    with st.form("signup_form"):
-        username = st.text_input("Username", key="signup_username")
-        email = st.text_input("Email", key="signup_email")
-        password = st.text_input("Password", type="password", key="signup_password")
-        confirm_password = st.text_input("Confirm Password", type="password", key="signup_confirm")
-
-        col1, col2 = responsive_ui.get_responsive_columns(2, mobile_count=1)
-        with col1:
-            signup_submitted = st.form_submit_button("Sign Up", width='stretch')
-        with col2:
-            login_page = st.form_submit_button("Back to Login", width='stretch')
-
-    if signup_submitted:
-        success, message = auth_manager.signup(username, email, password, confirm_password)
-        if success:
-            st.success(message)
-            st.session_state.page = 'login'
-            st.rerun()
-        else:
-            st.error(message)
-
-    if login_page:
-        st.session_state.page = 'login'
-        st.rerun()
-
     st.markdown('</div>', unsafe_allow_html=True)
 
 
-
-def show_forgot_password_page():
-    st.markdown(render_auth_form_styles(), unsafe_allow_html=True)
-
-    st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-    st.markdown('<div class="auth-title">🔑 Forgot Password</div>', unsafe_allow_html=True)
-    st.markdown('<div class="auth-caption">Enter your email to receive a secure password reset link.</div>', unsafe_allow_html=True)
-
-    with st.form("forgot_form"):
-        email = st.text_input("Email", key="forgot_email")
-
-        col1, col2 = responsive_ui.get_responsive_columns(2, mobile_count=1)
-        with col1:
-            reset_submitted = st.form_submit_button("Send Reset Email", width='stretch')
-        with col2:
-            back = st.form_submit_button("Back to Login", width='stretch')
-
-    if reset_submitted:
-        if not email:
-            st.error("Please enter your email.")
-        else:
-            success, message = auth_manager.forgot_password(email)
-            if success:
-                st.success(message)
-            else:
-                st.error(message)
-
-    if back:
-        st.session_state.page = 'login'
-        st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-
-def show_pin_entry_page():
-    st.markdown(render_auth_form_styles(), unsafe_allow_html=True)
-    st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-    st.markdown('<div class="auth-title">🔐 Enter Security PIN</div>', unsafe_allow_html=True)
-    st.markdown('<div class="auth-caption">Use your 4-digit security PIN to complete login.</div>', unsafe_allow_html=True)
-
-    if not st.session_state.pending_pin_user:
-        st.error("PIN authentication requires a verified login attempt.")
-        if st.button("Back to Login", key="pin_back_login"):
-            st.session_state.page = 'login'
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-        return
-
-    # Use a single form for PIN entry to avoid per-button reruns
-    with st.form("pin_form"):
-        pin_input = st.text_input("Security PIN", type="password", max_chars=4, key="pin_entry_input", value=st.session_state.pin_entry)
-        pin_submit = st.form_submit_button("Authenticate PIN", width='stretch')
-
-    # Persist the input back to session state
-    st.session_state.pin_entry = pin_input or st.session_state.pin_entry
-
-    if pin_submit:
-        if not st.session_state.pin_entry or len(st.session_state.pin_entry) != 4:
-            st.error("Please enter your 4-digit PIN.")
-        else:
-            success, message = auth_manager.validate_security_pin(
-                st.session_state.pending_pin_user,
-                st.session_state.pin_entry,
-                st.session_state.pending_pin_remember
-            )
-            if success:
-                st.success(message)
-                st.session_state.page = 'dashboard'
-                st.session_state.pending_pin_user = None
-                st.session_state.pending_pin_remember = False
-                st.session_state.pin_entry = ''
-                st.session_state.pin_attempts = 0
-                st.rerun()
-            else:
-                st.session_state.pin_attempts += 1
-                if st.session_state.pin_attempts >= 3:
-                    st.error("Too many attempts. Returning to login.")
-                    st.session_state.pending_pin_user = None
-                    st.session_state.pending_pin_remember = False
-                    st.session_state.pin_entry = ''
-                    st.session_state.pin_attempts = 0
-                    st.session_state.page = 'login'
-                    st.rerun()
-                else:
-                    st.error(message)
-
-    if st.button("Back to Login", key="pin_back"):
-        st.session_state.pending_pin_user = None
-        st.session_state.pending_pin_remember = False
-        st.session_state.pin_entry = ''
-        st.session_state.page = 'login'
-        st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-
-def show_pin_reset_request_page():
-    st.markdown(render_auth_form_styles(), unsafe_allow_html=True)
-    st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-    st.markdown('<div class="auth-title">🔓 Reset Security PIN</div>', unsafe_allow_html=True)
-    st.markdown('<div class="auth-caption">Enter your email to receive a secure PIN reset link.</div>', unsafe_allow_html=True)
-
-    with st.form("pin_reset_request_form"):
-        email = st.text_input("Email", key="pin_reset_email")
-        send_submitted = st.form_submit_button("Send PIN Reset Email", width='stretch')
-        back_to_login = st.form_submit_button("Back to Login", width='stretch')
-
-    if send_submitted:
-        if not email:
-            st.error("Please enter your email.")
-        else:
-            success, message = auth_manager.request_pin_reset(email)
-            if success:
-                st.success(message)
-            else:
-                st.error(message)
-
-    if back_to_login:
-        st.session_state.page = 'login'
-        st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-
-def show_pin_reset_page():
-    st.markdown(render_auth_form_styles(), unsafe_allow_html=True)
-    st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-    st.markdown('<div class="auth-title">🔑 Set New Security PIN</div>', unsafe_allow_html=True)
-    st.markdown('<div class="auth-caption">Create a new 4-digit PIN to protect your account.</div>', unsafe_allow_html=True)
-
-    query_params = st.query_params
-    token_param = query_params.get('token')
-    token = token_param[0] if token_param else ''
-
-    if not token:
-        st.error("Invalid or expired PIN reset link.")
-        if st.button("Back to Login", key="pin_reset_invalid_back"):
-            st.session_state.page = 'login'
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-        return
-
-    with st.form("pin_reset_form"):
-        pin = st.text_input("New PIN", type="password", max_chars=4, key="pin_reset_pin")
-        confirm_pin = st.text_input("Confirm New PIN", type="password", max_chars=4, key="pin_reset_confirm")
-        pin_reset_submitted = st.form_submit_button("Reset PIN", width='stretch')
-
-    if pin_reset_submitted:
-        if not pin or not confirm_pin:
-            st.error("Please complete both PIN fields.")
-        else:
-            success, message = auth_manager.reset_security_pin(token, pin)
-            if success:
-                st.success(message)
-                st.session_state.page = 'login'
-                st.rerun()
-            else:
-                st.error(message)
-
-    if st.button("Back to Login", key="pin_reset_back"):
-        st.session_state.page = 'login'
-        st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-
-def show_reset_password_page():
-    st.markdown(render_auth_form_styles(), unsafe_allow_html=True)
-
-    st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-    st.markdown('<div class="auth-title">🔑 Reset Password</div>', unsafe_allow_html=True)
-    st.markdown('<div class="auth-caption">Create a strong new password to secure your account.</div>', unsafe_allow_html=True)
-
-    # Get token from URL params
-    query_params = st.query_params
-    token_param = query_params.get('token')
-    token = token_param[0] if token_param else ''
-
-    if not token:
-        st.error("Invalid reset link.")
-        return
-
-    with st.form("reset_form"):
-        new_password = st.text_input("New Password", type="password", key="reset_password")
-        confirm_password = st.text_input("Confirm Password", type="password", key="reset_confirm")
-
-        reset_submitted = st.form_submit_button("Reset Password", width='stretch')
-
-    if reset_submitted:
-        success, message = auth_manager.reset_password(token, new_password, confirm_password)
-        if success:
-            st.success(message)
-            st.session_state.page = 'login'
-            st.rerun()
-        else:
-            st.error(message)
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# --- App Views ---
 def show_dashboard_page(user):
     st.markdown("""
     <div class="hero-panel">
       <div class="hero-deco"></div>
       <div class="hero-deco-two"></div>
       <div class="hero-logo">SS</div>
-      <div class="hero-title">SP 07 Ai Stock Forecasting and Advisory Intelligence</div>
+      <div class="hero-title">SP 07 AI Stock Forecasting and Advisory Intelligence</div>
       <div class="hero-subtitle">Premium market forecasting, AI-backed alerts, and portfolio pulse in a single executive dashboard.</div>
       <div class="market-pill">AI Confidence 89%</div>
       <div class="market-pill">Real-time signals</div>
@@ -1106,64 +831,19 @@ def show_dashboard_page(user):
                                     with pd.ExcelWriter(excel_buffer_q, engine=excel_engine) as writer_q:
                                         summary_df_q = pd.DataFrame([[r[0], r[1]] for r in summary_rows_q], columns=["Metric", "Value"])
                                         summary_df_q = clean_dataframe_for_export(summary_df_q, convert_index=False)
-                                        summary_df_q.to_excel(writer_q, index=False, sheet_name="Summary")
-
-                                        # Forecast details
-                                        forecast_rows_q = []
-                                        for days in forecast_periods_q:
-                                            if days in all_predictions_q and all_predictions_q[days]:
-                                                for i, price in enumerate(all_predictions_q[days]):
-                                                    forecast_rows_q.append({
-                                                        "Forecast Period (Days)": days,
-                                                        "Day": i + 1,
-                                                        "Predicted Price": price
-                                                    })
-
-                                        if forecast_rows_q:
-                                            forecast_df_q = pd.DataFrame(forecast_rows_q)
-                                            forecast_df_q = clean_dataframe_for_export(forecast_df_q, convert_index=False)
-                                            forecast_df_q.to_excel(writer_q, index=False, sheet_name="Forecasts")
-
-                                        # Historical data
-                                        if not df_quick.empty:
-                                            hist_df_q = df_quick[['Close', 'Volume']].reset_index()
-                                            if 'Date' not in hist_df_q.columns:
-                                                hist_df_q.rename(columns={hist_df_q.columns[0]: 'Date'}, inplace=True)
-                                            hist_df_q = clean_dataframe_for_export(hist_df_q, convert_index=False)
-                                            hist_df_q.to_excel(writer_q, index=False, sheet_name="Historical Data")
-
+                                        summary_df_q.to_excel(writer_q, index=False, sheet_name="Quick_Analysis")
                                     excel_buffer_q.seek(0)
                                     st.download_button(
-                                        label=f"⬇️ Download Excel Report for {qs}",
-                                        data=excel_buffer_q,
-                                        file_name=f"{qs}_quick_analysis.xlsx",
-                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                        key=f"download_excel_quick_{qs}"
+                                        label="Download Quick Excel Report",
+                                        data=excel_buffer_q.getvalue(),
+                                        file_name=f"quick_analysis_{qs}.xlsx",
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                                     )
+                            except Exception:
+                                pass
 
-                                # PDF export
-                                try:
-                                    pdf_buf_q = build_pdf_report(
-                                        stock_symbol=qs,
-                                        current_price=current_price_q,
-                                        forecast_periods=forecast_periods_q,
-                                        all_predictions=all_predictions_q,
-                                        stock_data=df_quick,
-                                    )
-                                    st.download_button(
-                                        label=f"⬇️ Download Branded PDF Report for {qs}",
-                                        data=pdf_buf_q,
-                                        file_name=f"{qs}_quick_analysis.pdf",
-                                        mime="application/pdf",
-                                        key=f"download_pdf_quick_{qs}"
-                                    )
-                                except ImportError:
-                                    st.warning("PDF export requires reportlab. Install with: pip install reportlab")
-                                except Exception as e:
-                                    logger.error(f"Quick PDF export failed: {e}")
-                                    st.error(f"PDF export failed: {e}")
-                            except Exception as e:
-                                st.error(f"Report generation failed: {e}")
+                            st.success(f"Quick analysis completed for {qs}.")
+                            st.caption(f"Current price: ₹{current_price_q:.2f}")
 
     st.markdown("### Market insights")
     chart_col, summary_col = responsive_ui.get_responsive_columns(2, mobile_count=1, gap='large')
@@ -1949,7 +1629,7 @@ def show_analysis_page():
                         plot_bgcolor='rgba(0,0,0,0)',
                         margin=dict(t=40, l=20, r=20, b=20),
                         height=300,
-                        yaxis=dict(range=[0, 100], title='Confidence %')
+                        yaxis=dict(title='Confidence %')
                     )
                     
                     st.plotly_chart(conf_chart, width='stretch')
@@ -2404,9 +2084,8 @@ def show_portfolio_page():
 
 
 def show_settings_page():
-    render_back_button(target_page='dashboard', label='← Back to Dashboard', key='back_settings')
-    st.markdown('## Settings')
-    st.write('Update user preferences, security settings, and theme options.')
+    st.subheader("Settings")
+    st.write("Update user preferences, security settings, and theme options.")
 
     if 'user_preferences' not in st.session_state:
         st.session_state.user_preferences = {
@@ -2456,10 +2135,10 @@ def show_main_app():
 <style>
 body {{ background: linear-gradient(135deg, #080b16, #07111f, #0b1932, #111b3e); color: {primary_text}; }}
 .stApp {{ background: {page_background}; }}
-.hero-panel {{ background: radial-gradient(circle at top right, rgba(34,211,238,0.18), transparent 35%), radial-gradient(circle at bottom left, rgba(168,85,247,0.12), transparent 28%), {card_bg}; border: 1px solid rgba(255,255,255,0.12); border-radius: 32px; padding: 3rem 2rem 2rem; position: relative; overflow: hidden; margin-bottom: 2rem; text-align: center; }}
+.hero-panel {{ background: radial-gradient(circle at top right, rgba(34,211,238,0.18), transparent 35%), radial-gradient(circle at bottom left, rgba(168,85,247,0.12), transparent 28%), {card_bg}; border: 1px solid rgba(255,255,255,0.12); border-radius: 32px; padding: 3rem 2rem 2rem; position: relative; overflow: hidden; }}
 .hero-panel::before {{ content: ''; position: absolute; width: 320px; height: 320px; top: -90px; right: -90px; background: rgba(34,211,238,0.3); filter: blur(90px); }}
 .hero-panel::after {{ content: ''; position: absolute; width: 220px; height: 220px; bottom: -80px; left: -80px; background: rgba(168,85,247,0.24); filter: blur(70px); animation: float-shape 18s ease-in-out infinite; }}
-.hero-title {{ font-size: 3.4rem; font-weight: 800; margin: 1.2rem auto 0.8rem; line-height: 1.02; letter-spacing: -0.04em; max-width: 860px; background: linear-gradient(90deg, #38bdf8, #7c3aed, #22c55e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; color: transparent; animation: glow-text 4s ease-in-out infinite alternate; }}
+.hero-title {{ font-size: 3.4rem; font-weight: 800; margin: 1.2rem auto 0.8rem; line-height: 0.98; letter-spacing: -0.04em; max-width: 860px; background: linear-gradient(90deg, #38bdf8, #7c3aed, #22c55e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; color: transparent; animation: glow-text 4s ease-in-out infinite alternate; }}
 .hero-subtitle {{ color: {secondary_text}; font-size: 1.15rem; margin: 0.8rem auto 0; max-width: 820px; opacity: 0.95; line-height: 1.65; }}
 .market-pill {{ display: inline-flex; align-items: center; justify-content: center; padding: 0.55rem 1rem; border-radius: 999px; background: rgba(14,165,233,0.18); border: 1px solid rgba(56,189,248,0.25); color: {primary_text}; margin: 0.35rem 0.35rem; animation: pulse-pill 4s ease-in-out infinite alternate; min-width: 150px; }}
 .hero-logo {{ margin: 0 auto; width: 110px; height: 110px; border-radius: 50%; border: 1px solid rgba(56,189,248,0.35); display: flex; align-items: center; justify-content: center; color: #ffffff; font-weight: 700; letter-spacing: 0.05em; font-size: 0.95rem; text-transform: uppercase; box-shadow: 0 0 40px rgba(56,189,248,0.18); background: rgba(255,255,255,0.04); position: relative; z-index: 1; }}
@@ -2537,7 +2216,7 @@ def show_admin_dashboard():
         st.info("No system health metrics available yet.")
 
     st.markdown("---")
-    if st.button("Open Admin Tools", key='open_admin_tools', width='stretch'):
+    if st.button("Open Admin Tools", key='admin_open_training'):
         st.session_state.page = 'admin_tools'
         st.rerun()
 

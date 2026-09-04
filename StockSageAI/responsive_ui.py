@@ -14,20 +14,27 @@ MOBILE_FIRST_STYLES = """
 <style>
 /* CSS Variables for theming */
 :root {
-    --primary-color: #38bdf8;
-    --primary-dark: #0369a1;
-    --danger-color: #ef4444;
-    --success-color: #10b981;
-    --warning-color: #f59e0b;
-    --bg-dark: #0f172a;
-    --bg-darker: #030712;
+    --primary-color: #7c3aed;
+    --primary-2: #22d3ee;
+    --primary-3: #a78bfa;
+    --primary-dark: #1d4ed8;
+    --danger-color: #f87171;
+    --success-color: #34d399;
+    --warning-color: #fbbf24;
+    --bg-dark: #07111f;
+    --bg-darker: #020817;
+    --bg-panel: rgba(15, 23, 42, 0.8);
+    --bg-panel-strong: rgba(15, 23, 42, 0.92);
     --text-primary: #e2e8f0;
     --text-secondary: #cbd5e1;
-    --border-color: rgba(96, 165, 250, 0.18);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.2);
-    --shadow-xl: 0 20px 50px rgba(0, 0, 0, 0.3);
+    --border-color: rgba(148, 163, 184, 0.22);
+    --shadow-sm: 0 8px 22px rgba(15, 23, 42, 0.14);
+    --shadow-md: 0 12px 26px rgba(60, 88, 179, 0.22);
+    --shadow-lg: 0 18px 40px rgba(34, 211, 238, 0.15);
+    --shadow-xl: 0 30px 80px rgba(124, 58, 237, 0.18);
+    --radius-sm: 14px;
+    --radius-md: 18px;
+    --radius-lg: 24px;
 }
 
 /* Base Mobile-First Styles */
@@ -41,8 +48,141 @@ html, body {
     margin: 0;
     padding: 0;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-    background: var(--bg-darker);
+    background:
+        radial-gradient(circle at top left, rgba(124, 58, 237, 0.20), transparent 35%),
+        radial-gradient(circle at top right, rgba(34, 211, 238, 0.18), transparent 30%),
+        linear-gradient(180deg, #020817 0%, #07111f 100%);
     color: var(--text-primary);
+}
+
+div[data-testid="stAppViewContainer"] {
+    background: transparent;
+}
+
+div[data-testid="stAppViewContainer"] > .main {
+    background: transparent;
+}
+
+section[data-testid="stSidebar"] {
+    background: rgba(11, 18, 32, 0.92) !important;
+    border-right: 1px solid var(--border-color);
+    box-shadow: var(--shadow-md);
+}
+
+div.block-container {
+    padding-top: 2rem !important;
+    padding-bottom: 2rem !important;
+    max-width: 1500px !important;
+}
+
+/* Premium glass cards */
+.responsive-card,
+.metric-card,
+[data-testid="stMetric"] {
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(15, 23, 42, 0.7));
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+/* Buttons */
+.responsive-btn,
+button[kind="primary"],
+button[kind="secondary"],
+button[kind="tertiary"] {
+    border-radius: 12px !important;
+    border: 1px solid rgba(124, 58, 237, 0.35) !important;
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.92), rgba(59, 130, 246, 0.82)) !important;
+    color: white !important;
+    box-shadow: var(--shadow-md);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    font-weight: 600;
+}
+
+.responsive-btn:hover,
+button[kind="primary"]:hover,
+button[kind="secondary"]:hover,
+button[kind="tertiary"]:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-lg);
+    filter: brightness(1.06);
+}
+
+/* Inputs */
+input, textarea, select, .stTextInput input, .stNumberInput input, .stSelectbox select {
+    border-radius: 12px !important;
+    border: 1px solid var(--border-color) !important;
+    background: rgba(15, 23, 42, 0.7) !important;
+    color: var(--text-primary) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+/* Metrics */
+.metric-card {
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.12), rgba(34, 211, 238, 0.06));
+    border: 1px solid rgba(124, 58, 237, 0.18);
+    border-radius: var(--radius-md);
+    padding: clamp(1rem, 3vw, 1.5rem);
+    text-align: center;
+}
+
+.metric-value {
+    font-size: clamp(1.4rem, 4vw, 2.3rem);
+    font-weight: 700;
+    color: var(--primary-2);
+    margin: 0.35rem 0;
+}
+
+.metric-label {
+    font-size: clamp(0.75rem, 1.8vw, 0.9rem);
+    color: var(--text-secondary);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+/* Sections and cards */
+section[data-testid="stFileUploader"],
+section[data-testid="stForm"],
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    border-radius: var(--radius-md) !important;
+}
+
+/* Tables */
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.table-responsive table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table-responsive th {
+    background: rgba(124, 58, 237, 0.10);
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.table-responsive td {
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    color: var(--text-secondary);
+}
+
+/* Premium page titles */
+h1 {
+    background: linear-gradient(90deg, #f8fafc 0%, #7dd3fc 22%, #c4b5fd 65%, #f9a8d4 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    letter-spacing: -0.04em;
 }
 
 /* Mobile: Default - Single column, full width */

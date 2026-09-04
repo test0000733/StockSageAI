@@ -289,3 +289,11 @@ def render_admin_training_dashboard():
         </ul>
     </div>
     """, unsafe_allow_html=True)
+
+def render_telegram_section():
+    """Render Telegram Forecast section in admin dashboard"""
+    try:
+        from StockSageAI.telegram_dashboard import render_telegram_dashboard
+        render_telegram_dashboard()
+    except Exception as e:
+        st.error(f"❌ Error loading Telegram dashboard: {str(e)}")

@@ -161,6 +161,84 @@ class Database:
                 )
             ''')
 
+            # Telegram Forecast History
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS telegram_forecast_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    forecast_date DATE NOT NULL,
+                    symbol TEXT NOT NULL,
+                    current_price REAL NOT NULL,
+                    forecast_7d REAL,
+                    forecast_14d REAL,
+                    forecast_30d REAL,
+                    signal_7d TEXT,
+                    signal_14d TEXT,
+                    signal_30d TEXT,
+                    confidence_7d REAL,
+                    confidence_14d REAL,
+                    confidence_30d REAL,
+                    sentiment_score REAL,
+                    model_version TEXT,
+                    data_timestamp DATETIME,
+                    actual_price_7d REAL,
+                    actual_price_14d REAL,
+                    actual_price_30d REAL,
+                    accuracy_7d REAL,
+                    accuracy_14d REAL,
+                    accuracy_30d REAL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(forecast_date, symbol)
+                )
+            ''')
+
+            # Telegram Notification History
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS telegram_notification_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    notification_date DATE NOT NULL,
+                    notification_type TEXT DEFAULT 'daily_forecast',
+                    status TEXT NOT NULL,
+                    stocks_sent INTEGER,
+                    stocks_failed INTEGER,
+                    message_ids TEXT,
+                    telegram_chat_id TEXT,
+                    sent_timestamp DATETIME,
+                    retry_count INTEGER DEFAULT 0,
+                    error_message TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(notification_date, notification_type)
+                )
+            ''')
+
+            # Telegram Model Performance Metrics
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS telegram_model_performance (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    model_name TEXT NOT NULL,
+                    symbol TEXT NOT NULL,
+                    forecast_horizon INTEGER NOT NULL,
+                    mae REAL,
+                    rmse REAL,
+                    mape REAL,
+                    directional_accuracy REAL,
+                    sample_count INTEGER,
+                    evaluation_date DATE,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(model_name, symbol, forecast_horizon, evaluation_date)
+                )
+            ''')
+
+            # Telegram System Configuration
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS telegram_config (
+                    config_key TEXT PRIMARY KEY,
+                    config_value TEXT NOT NULL,
+                    description TEXT,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
             conn.commit()
 
         self._ensure_default_user()
@@ -598,6 +676,147 @@ class Database:
             ''', (user_id, limit))
             rows = cursor.fetchall()
             columns = [desc[0] for desc in cursor.description]
+            return [dict(zip(columns, row)) for row in rows]
+
+    # ==================== TELEGRAM FORECAST METHODS ====================
+
+    def save_forecast(self, forecast_date, symbol, current_price, forecasts, signals, confidence, sentiment_score, data_timestamp):
+        """Save forecast to database"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute('''
+                    INSERT OR REPLACE INTO telegram_forecast_history 
+                    (forecast_date, symbol, current_price, forecast_7d, forecast_14d, forecast_30d,
+                     signal_7d, signal_14d, signal_30d, confidence_7d, confidence_14d, confidence_30d,
+                     sentiment_score, data_timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    forecast_date,
+                    symbol,
+                    current_price,
+                    forecasts.get(7),
+                    forecasts.get(14),
+                    forecasts.get(30),
+                    signals.get(7),
+                    signals.get(14),
+                    signals.get(30),
+                    confidence.get(7),
+                    confidence.get(14),
+                    confidence.get(30),
+                    sentiment_score,
+                    data_timestamp
+                ))
+                conn.commit()
+                return True
+            except Exception as e:
+                import logging
+                logging.error(f"Error saving forecast: {str(e)}")
+                return False
+
+    def save_notification(self, notification_date, status, stocks_sent, stocks_failed, message_ids, error_message=""):
+        """Save notification history"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute('''
+                    INSERT OR REPLACE INTO telegram_notification_history
+                    (notification_date, notification_type, status, stocks_sent, stocks_failed,
+                     message_ids, sent_timestamp, error_message)
+                    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+                ''', (
+                    notification_date,
+                    'daily_forecast',
+                    status,
+                    stocks_sent,
+                    stocks_failed,
+                    ','.join(str(m) for m in message_ids) if message_ids else '',
+                    error_message
+                ))
+                conn.commit()
+                return True
+            except Exception as e:
+                import logging
+                logging.error(f"Error saving notification: {str(e)}")
+                return False
+
+    def get_last_notification_status(self):
+        """Get status of last notification"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT * FROM telegram_notification_history
+                ORDER BY notification_date DESC LIMIT 1
+            ''')
+            row = cursor.fetchone()
+            if row:
+                columns = [desc[0] for desc in cursor.description]
+                return dict(zip(columns, row))
+            return None
+
+    def save_model_performance(self, model_name, symbol, forecast_horizon, mae, rmse, mape, directional_accuracy, sample_count):
+        """Save model performance metrics"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                from datetime import datetime
+                evaluation_date = datetime.now().date()
+                cursor.execute('''
+                    INSERT OR REPLACE INTO telegram_model_performance
+                    (model_name, symbol, forecast_horizon, mae, rmse, mape, directional_accuracy, 
+                     sample_count, evaluation_date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    model_name, symbol, forecast_horizon, mae, rmse, mape, 
+                    directional_accuracy, sample_count, evaluation_date
+                ))
+                conn.commit()
+                return True
+            except Exception as e:
+                import logging
+                logging.error(f"Error saving model performance: {str(e)}")
+                return False
+
+    def get_model_performance_summary(self):
+        """Get overall model performance summary"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT 
+                    AVG(directional_accuracy) as avg_accuracy,
+                    MAX(directional_accuracy) as max_accuracy,
+                    COUNT(DISTINCT symbol) as symbols_evaluated,
+                    MAX(evaluation_date) as last_updated
+                FROM telegram_model_performance
+                WHERE evaluation_date >= DATE('now', '-30 days')
+            ''')
+            row = cursor.fetchone()
+            if row:
+                columns = [desc[0] for desc in cursor.description]
+                return dict(zip(columns, row))
+            return None
+
+    def get_forecast_history(self, symbol=None, days=30):
+        """Get forecast history for a stock or all stocks"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            if symbol:
+                cursor.execute('''
+                    SELECT * FROM telegram_forecast_history
+                    WHERE symbol = ? AND forecast_date >= DATE('now', '-' || ? || ' days')
+                    ORDER BY forecast_date DESC
+                ''', (symbol, days))
+            else:
+                cursor.execute('''
+                    SELECT * FROM telegram_forecast_history
+                    WHERE forecast_date >= DATE('now', '-' || ? || ' days')
+                    ORDER BY forecast_date DESC
+                ''', (days,))
+            
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            return [dict(zip(columns, row)) for row in rows]
+
             return [dict(zip(columns, row)) for row in rows]
 
     # ===== System Health Metrics =====
