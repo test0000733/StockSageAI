@@ -26,141 +26,78 @@ class TelegramNotifier:
         model_performance: Optional[Dict] = None
     ) -> str:
         """
-        Format daily forecast report for Telegram
-        
-        Args:
-            forecasts: Dict of symbol -> forecast result
-            model_performance: Historical model performance metrics
-            
-        Returns:
-            Formatted message string
+        Format a compact daily forecast report that fits in a single Telegram message.
         """
-        # Header
         msg = "📊 <b>AI DAILY STOCK FORECAST</b>\n\n"
-        
-        # Date and time
         now = datetime.now()
-        msg += f"📅 Date: {now.strftime('%d %b %Y')}\n"
-        msg += f"🕙 Generated: 10:15 AM IST\n"
-        
-        # Get latest data timestamp from forecasts
-        data_timestamps = [
-            f.get('data_timestamp', '') 
-            for f in forecasts.values() 
-            if f.get('data_timestamp')
-        ]
-        if data_timestamps:
-            msg += f"📡 Data Updated: {data_timestamps[0]}\n"
-        
-        msg += "\n" + "━" * 40 + "\n\n"
-        
-        # Top 10 stocks section
-        msg += "🏆 <b>TOP 10 STOCK FORECASTS</b>\n\n"
-        
-        success_count = 0
-        failed_stocks = []
-        
-        for i, (symbol, forecast) in enumerate(forecasts.items(), 1):
-            if not forecast.get('success'):
-                failed_stocks.append((symbol, forecast.get('error', 'Unknown error')))
-                continue
-            
-            success_count += 1
-            msg += self._format_stock_forecast(symbol, forecast, i)
-        
-        # Summary section
-        msg += "\n" + "━" * 40 + "\n\n"
-        msg += f"<b>📊 Summary:</b> {success_count} stocks forecasted"
-        
-        if failed_stocks:
-            msg += f", {len(failed_stocks)} unavailable\n"
-            msg += "Failed stocks: " + ", ".join([s[0] for s in failed_stocks])
-        else:
-            msg += "\n"
-        
-        # Model performance section
-        if model_performance:
-            msg += "\n" + "━" * 40 + "\n\n"
-            msg += "<b>📊 Model Performance</b>\n"
-            accuracy = model_performance.get('directional_accuracy', 0)
-            msg += f"Historical Directional Accuracy: {accuracy:.1f}%\n"
-            
-            if model_performance.get('last_updated'):
-                msg += f"Last Updated: {model_performance['last_updated']}\n"
-        
-        # Disclaimer
-        msg += "\n" + "━" * 40 + "\n\n"
-        msg += "⚠️ <b>DISCLAIMER</b>\n"
-        msg += "AI-generated educational forecast. Not financial advice.\n"
-        msg += "Predictions are probabilistic. Actual performance may differ.\n"
-        msg += "Always conduct your own research before investing."
-        
+        msg += f"📅 {now.strftime('%d %b %Y')} | 🕙 10:15 AM IST\n"
+
+        valid_forecasts = []
+        for symbol, forecast in forecasts.items():
+            if forecast.get('success'):
+                valid_forecasts.append((symbol, forecast))
+
+        if not valid_forecasts:
+            return msg + "No valid forecasts available today."
+
+        msg += "🏆 <b>TOP 10 RANKED PICKS</b>\n"
+        for index, (symbol, forecast) in enumerate(valid_forecasts[:10], 1):
+            msg += self._format_stock_forecast(symbol, forecast, index)
+
+        msg += "\n📌 <b>SUMMARY</b>\n"
+        accuracy = 0.0
+        if isinstance(model_performance, dict):
+            raw_accuracy = model_performance.get('avg_accuracy')
+            if raw_accuracy is not None:
+                try:
+                    accuracy = float(raw_accuracy)
+                except (TypeError, ValueError):
+                    accuracy = 0.0
+        msg += f"Stocks tracked: {len(valid_forecasts)} | Model accuracy: {accuracy:.1f}%"
+        msg += "\n\n⚠️ <b>DISCLAIMER</b>\nAI-generated forecast for education only. Not investment advice."
         return msg
-    
+
     def _format_stock_forecast(
         self,
         symbol: str,
         forecast: Dict,
         index: int
     ) -> str:
-        """Format a single stock forecast"""
-        msg = f"<b>{index}️⃣ {symbol}</b>\n"
-        
-        current = forecast.get('current_price', 0)
-        if current > 0:
-            msg += f"Current: ₹{current:,.2f}\n"
-        
-        # Forecasts for each horizon
+        """Format one stock in a compact, single-message-safe form."""
+        current = float(forecast.get('current_price') or 0)
         forecasts = forecast.get('forecasts', {})
-        if 7 in forecasts:
-            price_7d = forecasts[7]
-            change_7d = ((price_7d - current) / current * 100) if current > 0 else 0
-            msg += f"📈 7D: ₹{price_7d:,.2f} ({change_7d:+.2f}%)\n"
-        
-        if 14 in forecasts:
-            price_14d = forecasts[14]
-            change_14d = ((price_14d - current) / current * 100) if current > 0 else 0
-            msg += f"📈 14D: ₹{price_14d:,.2f} ({change_14d:+.2f}%)\n"
-        
-        if 30 in forecasts:
-            price_30d = forecasts[30]
-            change_30d = ((price_30d - current) / current * 100) if current > 0 else 0
-            msg += f"📈 30D: ₹{price_30d:,.2f} ({change_30d:+.2f}%)\n"
-        
-        # Signal from 14D (main signal)
-        signal = forecast.get('signals', {}).get(14, 'HOLD')
-        confidence = forecast.get('confidence', {}).get(14, 50)
-        details = forecast.get('horizon_details', {}).get(14, {})
-        risk_level = details.get('risk_level', 'Medium')
-        expected_return = details.get('expected_return_pct', 0.0)
-        confluence = details.get('confluence_score', 50.0)
-        scenario = details.get('scenario', 'Base')
-        
-        emoji = self.emoji_map.get(signal, '🟡')
-        msg += f"Signal: {emoji} {signal}\n"
-        if expected_return is not None:
-            msg += f"Expected Return: {expected_return:+.2f}% | Confidence: {confidence:.1f}%\n"
-        else:
-            msg += f"Confidence: {confidence:.1f}%\n"
-        msg += f"Risk: {risk_level} | Scenario: {scenario} | Confluence: {confluence:.1f}%\n"
-        
-        # Reasoning
-        reasoning = forecast.get('metadata', {}).get('14d_reasoning', '')
-        if reasoning:
-            if len(reasoning) > 180:
-                reasoning = reasoning[:177] + '...'
-            msg += f"Reason: {reasoning}\n"
-        
-        # Rich factors if available
-        positive_factors = details.get('positive_factors', [])
-        negative_factors = details.get('negative_factors', [])
-        if positive_factors:
-            msg += f"Positive: {', '.join(positive_factors[:2])}\n"
-        if negative_factors:
-            msg += f"Negative: {', '.join(negative_factors[:2])}\n"
-        
-        msg += "\n"
-        return msg
+        signals = forecast.get('signals', {})
+        confidence = forecast.get('confidence', {})
+        details = forecast.get('horizon_details', {})
+
+        p7 = forecasts.get(7)
+        p14 = forecasts.get(14)
+        p30 = forecasts.get(30)
+        signal = signals.get(14, 'HOLD')
+        conf = float(confidence.get(14, 0) or 0)
+        metric = details.get(14, {})
+        risk = metric.get('risk_level', 'Medium')
+        scenario = metric.get('scenario', 'Base')
+
+        def fmt_change(target_price):
+            if current <= 0 or target_price is None:
+                return 'n/a'
+            pct = ((float(target_price) - current) / current) * 100
+            return f"{pct:+.1f}%"
+
+        if p7 is None:
+            p7 = current
+        if p14 is None:
+            p14 = current
+        if p30 is None:
+            p30 = current
+
+        emoji = self.emoji_map.get(str(signal).upper(), '🟡')
+        return (
+            f"{index}. <b>{symbol}</b> | ₹{current:,.0f} | "
+            f"7D {fmt_change(p7)} | 14D {fmt_change(p14)} | 30D {fmt_change(p30)} | "
+            f"{emoji} {signal.upper()} {conf:.0f}% | Risk {risk} | {scenario}\n"
+        )
     
     def format_test_message(self) -> str:
         """Format a test message"""

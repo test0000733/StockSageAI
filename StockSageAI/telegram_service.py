@@ -196,11 +196,13 @@ class TelegramService:
         Returns:
             Tuple of (all_sent: bool, message_ids: List[str])
         """
-        if len(text) <= chunk_size:
-            return self.send_message(text)
+        safe_limit = min(chunk_size, 3900)
+        if len(text) <= safe_limit:
+            success, message_id = self.send_message(text)
+            return success, [message_id] if success else []
         
         message_ids = []
-        chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+        chunks = [text[i:i+safe_limit] for i in range(0, len(text), safe_limit)]
         
         for i, chunk in enumerate(chunks, 1):
             success, msg_id = self.send_message(chunk)
