@@ -256,22 +256,42 @@ def render_telegram_dashboard():
     # ============ TAB 5: SETTINGS ============
     with tab5:
         st.subheader("Configuration & Settings", divider="blue")
-        
-        st.warning("⚠️ Only modify settings if you know what you're doing")
-        
-        # Scheduler settings
-        with st.expander("🔔 Scheduler Settings"):
+        st.warning("⚠️ Update the daily send time and scheduler state here. Changes apply immediately to the running scheduler.")
+
+        with st.form("telegram_runtime_settings_form"):
             col1, col2 = st.columns(2)
-            
             with col1:
-                st.write(f"**Schedule Time:** {scheduler.schedule_time} IST")
-                st.write(f"**Timezone:** Asia/Kolkata")
-            
+                enabled = st.checkbox(
+                    "Enable daily Telegram forecast delivery",
+                    value=scheduler.enabled,
+                    key="telegram_enabled_setting"
+                )
             with col2:
-                st.write(f"**Enabled:** {'✅ Yes' if scheduler.enabled else '❌ No'}")
-                st.write(f"**Running:** {'✅ Yes' if scheduler.is_running else '❌ No'}")
-        
-        # Telegram credentials (masked)
+                current_time = datetime.strptime(scheduler.schedule_time, '%H:%M').time()
+                schedule_time = st.time_input(
+                    "Daily send time (IST)",
+                    value=current_time,
+                    key="telegram_schedule_time_setting"
+                )
+
+            format_choice = st.selectbox(
+                "Message format",
+                options=['compact', 'balanced', 'detailed'],
+                index=['compact', 'balanced', 'detailed'].index(
+                    db.get_telegram_config('telegram_message_format', 'compact')
+                ) if db.get_telegram_config('telegram_message_format', 'compact') in ['compact', 'balanced', 'detailed'] else 0,
+                key='telegram_message_format_setting'
+            )
+
+            submitted = st.form_submit_button("💾 Save Telegram Settings", use_container_width=True)
+            if submitted:
+                scheduler.update_settings(
+                    enabled=enabled,
+                    schedule_time=schedule_time.strftime('%H:%M')
+                )
+                db.set_telegram_config('telegram_message_format', format_choice)
+                st.success(f"✅ Telegram settings saved. Scheduler is {'enabled' if enabled else 'disabled'} and sending at {schedule_time.strftime('%H:%M')} IST.")
+
         with st.expander("🔐 Telegram Credentials"):
             import os
             from dotenv import load_dotenv
@@ -282,8 +302,8 @@ def render_telegram_dashboard():
             
             st.warning("Credentials are masked for security")
             st.write(f"Bot Token: `{bot_token}`")
-            st.write(f"Chat ID: `{int(chat_id)}`")
-        
+            st.write(f"Chat ID: `{chat_id}`")
+
         # Database info
         with st.expander("📦 Database Information"):
             last_notif = db.get_last_notification_status()

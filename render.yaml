@@ -9,3 +9,13 @@ services:
     startCommand: streamlit run StockSageAI/app.py --server.port $PORT --server.headless true
     disk: 512
     region: oregon
+
+  - type: worker
+    name: stocksage-telegram-scheduler
+    env: docker
+    plan: starter
+    branch: main
+    dockerfilePath: Dockerfile
+    startCommand: python start_telegram_scheduler.py
+    disk: 512
+    region: oregon

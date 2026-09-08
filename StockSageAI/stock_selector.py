@@ -36,18 +36,18 @@ INDIAN_UNIVERSE_SEED = [
     'SOLARINDS', 'SYNGENE', 'UNIPHOS', 'VOLTAS'
 ]
 
-# Default Top 10 Indian stocks (NSE) - can be customized
+# Default Top 10 Indian stocks (NSE) - stable, live-market validated on Yahoo Finance
 DEFAULT_TOP_10_STOCKS = [
     'RELIANCE.NS',
     'TCS.NS',
     'INFY.NS',
-    'HDFC.NS',
-    'HINDUNILVR.NS',
+    'HDFCBANK.NS',
     'ICICIBANK.NS',
-    'WIPRO.NS',
-    'MARUTI.NS',
-    'BAJAJ-AUTO.NS',
-    'LT.NS'
+    'SBIN.NS',
+    'LT.NS',
+    'ITC.NS',
+    'HINDUNILVR.NS',
+    'MARUTI.NS'
 ]
 
 # Popular stocks for news and momentum consideration
@@ -126,32 +126,36 @@ class StockSelector:
         Returns:
             List of 10 stock symbols with .NS or .BO suffix
         """
+        fallback = [s for s in DEFAULT_TOP_10_STOCKS if _has_live_data(s)]
+        if len(fallback) < 10:
+            fallback = DEFAULT_TOP_10_STOCKS
+
         if not use_dynamic:
-            logger.info(f"📊 Using default Top 10 stocks: {DEFAULT_TOP_10_STOCKS}")
-            return DEFAULT_TOP_10_STOCKS
-        
+            logger.info(f"📊 Using default Top 10 stocks: {fallback}")
+            return fallback
+
         # Check cache
         if not refresh and self._is_cache_valid():
             logger.info("📦 Using cached stock selection")
             return self._stocks_cache
-        
+
         # Generate dynamic selection
         logger.info("🔄 Generating dynamic Top 10 stock selection...")
         
         try:
             selected = self._select_by_factors()
+            selected = [s for s in selected if _has_live_data(s)]
             
             if len(selected) >= 10:
                 selected = selected[:10]
             elif len(selected) > 0:
-                logger.warning(f"⚠️ Could only select {len(selected)} stocks, padding with defaults...")
-                # Pad with defaults if needed
-                for stock in DEFAULT_TOP_10_STOCKS:
+                logger.warning(f"⚠️ Could only select {len(selected)} live stocks, padding with fallback...")
+                for stock in fallback:
                     if stock not in selected and len(selected) < 10:
                         selected.append(stock)
             else:
-                logger.warning("❌ Dynamic selection failed, using defaults")
-                selected = DEFAULT_TOP_10_STOCKS
+                logger.warning("❌ Dynamic selection failed, using live fallback")
+                selected = fallback
             
             self._stocks_cache = selected[:10]
             self._cache_time = datetime.now()
@@ -161,8 +165,8 @@ class StockSelector:
             
         except Exception as e:
             logger.error(f"❌ Error in dynamic selection: {str(e)}")
-            logger.info("📦 Falling back to default stocks")
-            return DEFAULT_TOP_10_STOCKS
+            logger.info("📦 Falling back to live default stocks")
+            return fallback
     
     def _is_cache_valid(self) -> bool:
         """Check if cached selection is still valid"""
@@ -181,6 +185,8 @@ class StockSelector:
         
         for symbol in candidates:
             try:
+                if not _has_live_data(symbol):
+                    continue
                 score = self._calculate_stock_score(symbol)
                 if score is not None and score > 0:
                     scored.append((symbol, score))
@@ -190,6 +196,7 @@ class StockSelector:
                 continue
         
         if not scored:
+            logger.warning("⚠️ No live-scored symbols found; using validated fallback set")
             return DEFAULT_TOP_10_STOCKS
         
         sorted_stocks = sorted(scored, key=lambda x: x[1], reverse=True)
@@ -321,6 +328,15 @@ class StockSelector:
         except Exception as e:
             logger.error(f"❌ Error exporting stock list: {str(e)}")
             return False
+
+
+def _has_live_data(symbol: str) -> bool:
+    """Return True when the symbol resolves on Yahoo Finance with recent data."""
+    try:
+        df = yf.download(symbol, period='5d', progress=False, auto_adjust=False, threads=False)
+        return bool(df is not None and not df.empty and len(df) > 0)
+    except Exception:
+        return False
 
 
 # Singleton instance

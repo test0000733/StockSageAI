@@ -8,7 +8,7 @@ import logging
 import schedule
 import time
 from typing import Callable, Optional
-from datetime import datetime, time as dt_time
+from datetime import datetime, time as dt_time, timedelta
 import pytz
 from dotenv import load_dotenv
 
@@ -90,9 +90,60 @@ class ForecastScheduler:
         self.forecast_callback = forecast_callback
         self.last_execution_date = None
         self.is_running = False
+        self.load_runtime_settings()
         
         logger.info(f"✅ Forecast Scheduler initialized (Time: {self.schedule_time} IST)")
-    
+
+    def _read_runtime_setting(self, key: str, default: str) -> str:
+        try:
+            db = __import__('StockSageAI.database', fromlist=['Database']).Database()
+            value = db.get_telegram_config(key, default)
+            if value is not None:
+                return str(value)
+        except Exception as exc:
+            logger.debug(f"Unable to read scheduler config '{key}': {exc}")
+        return str(default)
+
+    def load_runtime_settings(self):
+        """Reload Telegram settings from the database to keep the website dynamic."""
+        try:
+            enabled_value = self._read_runtime_setting('telegram_enabled', 'true').strip().lower()
+            self.enabled = enabled_value in ('1', 'true', 'yes', 'on')
+            os.environ['FORECAST_ENABLED'] = 'true' if self.enabled else 'false'
+        except Exception as exc:
+            logger.debug(f"Unable to sync enabled state: {exc}")
+
+        try:
+            time_value = self._read_runtime_setting('telegram_schedule_time', self.schedule_time).strip()
+            if time_value and len(time_value) >= 5:
+                validation = datetime.strptime(time_value, '%H:%M')
+                self.schedule_time = validation.strftime('%H:%M')
+                os.environ['FORECAST_SCHEDULE_TIME'] = self.schedule_time
+        except Exception as exc:
+            logger.debug(f"Unable to sync schedule time: {exc}")
+
+    def update_settings(self, enabled: Optional[bool] = None, schedule_time: Optional[str] = None):
+        """Update runtime scheduler settings and persist them to the database."""
+        if enabled is not None:
+            self.enabled = bool(enabled)
+            os.environ['FORECAST_ENABLED'] = 'true' if self.enabled else 'false'
+
+        if schedule_time is not None:
+            normalized = schedule_time.strip()
+            datetime.strptime(normalized, '%H:%M')
+            self.schedule_time = normalized
+            os.environ['FORECAST_SCHEDULE_TIME'] = normalized
+
+        try:
+            db = __import__('StockSageAI.database', fromlist=['Database']).Database()
+            db.set_telegram_config('telegram_enabled', 'true' if self.enabled else 'false')
+            db.set_telegram_config('telegram_schedule_time', self.schedule_time)
+        except Exception as exc:
+            logger.warning(f"Unable to persist scheduler settings: {exc}")
+
+        logger.info(f"🔧 Telegram scheduler settings updated: enabled={self.enabled}, time={self.schedule_time}")
+        return True
+
     def is_trading_day(self, check_date: Optional[datetime] = None) -> bool:
         """
         Check if a date is a valid NSE/BSE trading day
@@ -149,27 +200,25 @@ class ForecastScheduler:
         """Get formatted next run time"""
         now = datetime.now(IST)
         schedule_hour, schedule_minute = map(int, self.schedule_time.split(':'))
-        
-        # Check if we're past scheduled time today
-        scheduled_time = now.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
-        
-        if now >= scheduled_time:
-            # Already passed, find next trading day
-            check_date = now
-            for _ in range(7):  # Check next 7 days
-                check_date = check_date.replace(day=check_date.day + 1)
-                if self.is_trading_day(check_date):
-                    next_run = check_date.replace(hour=schedule_hour, minute=schedule_minute)
-                    return next_run.strftime('%d %b %Y %H:%M IST')
-        else:
-            # Today is the next run
-            if self.is_trading_day():
-                return scheduled_time.strftime('%d %b %Y %H:%M IST')
-        
+
+        target = now.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
+        if now < target:
+            if self.is_trading_day(now):
+                return target.strftime('%d %b %Y %H:%M IST')
+
+        # Advance day-by-day until the next trading day
+        cursor = now.date()
+        for _ in range(7):
+            next_day = datetime.combine(cursor, dt_time.min) + timedelta(days=1)
+            if self.is_trading_day(next_day):
+                next_run = next_day.replace(hour=schedule_hour, minute=schedule_minute, second=0, microsecond=0)
+                return next_run.strftime('%d %b %Y %H:%M IST')
+            cursor = next_day.date()
+
         return "Unknown"
     
     def start_scheduler(self):
-        """Start the scheduler in blocking mode (for servers)"""
+        """Start the scheduler in blocking mode using IST clock time."""
         if not self.enabled:
             logger.warning("⏸️ Scheduler is disabled")
             return
@@ -179,18 +228,25 @@ class ForecastScheduler:
             return
         
         logger.info("🚀 Starting Forecast Scheduler...")
-        
-        # Schedule daily at specified time
-        schedule.every().day.at(self.schedule_time).do(self._scheduled_run)
-        
-        self.is_running = True
         logger.info(f"📅 Scheduled to run daily at {self.schedule_time} IST")
         
-        # Run scheduler in blocking loop
+        self.is_running = True
+        last_trigger_day = None
+        
         try:
             while self.is_running:
-                schedule.run_pending()
-                time.sleep(60)  # Check every minute
+                now = datetime.now(IST)
+                current_time = now.strftime('%H:%M')
+                
+                if current_time == self.schedule_time:
+                    if self.should_run_today() and last_trigger_day != now.date():
+                        logger.info("⏰ 10:15 AM IST trigger reached, running forecast task")
+                        self._scheduled_run()
+                        last_trigger_day = now.date()
+                else:
+                    last_trigger_day = None
+
+                time.sleep(30)
                 
         except KeyboardInterrupt:
             logger.info("⏹️ Scheduler stopped by user")

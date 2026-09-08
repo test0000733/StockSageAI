@@ -50,10 +50,19 @@ from StockSageAI.data_loader import StockDataLoader
 from StockSageAI.stock_search import StockSearchEngine
 from StockSageAI.advanced_search_ui import AdvancedStockSearch
 from StockSageAI.admin_ai_ui import render_admin_training_dashboard
+from StockSageAI.telegram_dashboard import render_telegram_dashboard
 from StockSageAI import responsive_ui
 
 # Toggle verbose debug info in the app UI
 DEBUG_UI = True
+
+
+def render_back_button(target_page='dashboard', label='← Back', key='global_back_btn'):
+    """Render a simple and reliable navigation button for admin and detail pages."""
+    if st.button(label, key=key, use_container_width=False):
+        if target_page:
+            st.session_state.page = target_page
+            safe_rerun()
 
 
 def safe_rerun():
@@ -2110,8 +2119,11 @@ def show_settings_page():
 
     st.markdown('#### Security')
     st.write('Account security settings are managed by administrators.')
-
     st.write('Adjust your account security and notification preferences here.')
+
+    if auth_manager.has_any_role(['Super Admin', 'Admin']):
+        st.markdown('---')
+        render_telegram_dashboard()
 
 # --- Main App Content ---
 def show_main_app():
@@ -2187,6 +2199,8 @@ body {{ background: linear-gradient(135deg, #080b16, #07111f, #0b1932, #111b3e);
         show_pin_reset_page()
     elif active_page == 'admin_train':
         render_admin_training_dashboard()
+    elif active_page == 'telegram_dashboard':
+        render_telegram_dashboard()
     else:
         show_dashboard_page(auth_manager.get_current_user())
 
@@ -2247,6 +2261,185 @@ def show_admin_dashboard():
     with tab6:
         show_security_settings()
 
+    st.markdown("---")
+    if auth_manager.has_any_role(['Super Admin', 'Admin']):
+        render_telegram_dashboard()
+
+
+def show_settings_page():
+    st.subheader("Settings")
+    st.write("Update user preferences, security settings, and theme options.")
+
+    if 'user_preferences' not in st.session_state:
+        st.session_state.user_preferences = {
+            'theme': st.session_state.get('theme', 'dark'),
+            'email_alerts': True,
+            'newsletter': False,
+            'risk_profile': 'Balanced'
+        }
+
+    theme_selection = st.radio('App theme', ['dark', 'light'], index=0 if st.session_state.user_preferences['theme'] == 'dark' else 1, horizontal=True)
+    st.session_state.user_preferences['theme'] = theme_selection
+    st.session_state.theme = theme_selection
+
+    st.checkbox('Email alerts and system updates', key='pref_email_alerts', value=st.session_state.user_preferences['email_alerts'])
+    st.checkbox('Subscribe to newsletter', key='pref_newsletter', value=st.session_state.user_preferences['newsletter'])
+    risk_profile = st.selectbox('Risk profile', ['Conservative', 'Balanced', 'Growth', 'Active'], index=['Conservative', 'Balanced', 'Growth', 'Active'].index(st.session_state.user_preferences['risk_profile']))
+    st.session_state.user_preferences.update({
+        'email_alerts': st.session_state.get('pref_email_alerts', st.session_state.user_preferences['email_alerts']),
+        'newsletter': st.session_state.get('pref_newsletter', st.session_state.user_preferences['newsletter']),
+        'risk_profile': risk_profile
+    })
+
+    st.markdown('#### Security')
+    st.write('Account security settings are managed by administrators.')
+    st.write('Adjust your account security and notification preferences here.')
+
+    if auth_manager.has_any_role(['Super Admin', 'Admin']):
+        st.markdown('---')
+        render_telegram_dashboard()
+
+# --- Main App Content ---
+def show_main_app():
+    add_sidebar_navigation()
+
+    if 'theme' not in st.session_state:
+        st.session_state.theme = 'dark'
+
+    if st.button("🌓 Toggle Theme", width='stretch', key="theme_toggle_btn"):
+        st.session_state.theme = 'light' if st.session_state.theme == 'dark' else 'dark'
+        st.rerun()
+
+    is_dark = st.session_state.theme == 'dark'
+    page_background = '#050814' if is_dark else '#f8fafc'
+    primary_text = '#e0f7ff' if is_dark else '#0f172a'
+    secondary_text = '#67e8f9' if is_dark else '#0d9488'
+    card_bg = 'rgba(10, 16, 31, 0.94)' if is_dark else 'rgba(255,255,255,0.88)'
+    glow_color = 'rgba(34, 211, 238, 0.2)' if is_dark else 'rgba(56, 189, 248, 0.18)'
+
+    st.markdown(f"""
+<style>
+body {{ background: linear-gradient(135deg, #080b16, #07111f, #0b1932, #111b3e); color: {primary_text}; }}
+.stApp {{ background: {page_background}; }}
+.hero-panel {{ background: radial-gradient(circle at top right, rgba(34,211,238,0.18), transparent 35%), radial-gradient(circle at bottom left, rgba(168,85,247,0.12), transparent 28%), {card_bg}; border: 1px solid rgba(255,255,255,0.12); border-radius: 32px; padding: 3rem 2rem 2rem; position: relative; overflow: hidden; }}
+.hero-panel::before {{ content: ''; position: absolute; width: 320px; height: 320px; top: -90px; right: -90px; background: rgba(34,211,238,0.3); filter: blur(90px); }}
+.hero-panel::after {{ content: ''; position: absolute; width: 220px; height: 220px; bottom: -80px; left: -80px; background: rgba(168,85,247,0.24); filter: blur(70px); animation: float-shape 18s ease-in-out infinite; }}
+.hero-title {{ font-size: 3.4rem; font-weight: 800; margin: 1.2rem auto 0.8rem; line-height: 0.98; letter-spacing: -0.04em; max-width: 860px; background: linear-gradient(90deg, #38bdf8, #7c3aed, #22c55e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; color: transparent; animation: glow-text 4s ease-in-out infinite alternate; }}
+.hero-subtitle {{ color: {secondary_text}; font-size: 1.15rem; margin: 0.8rem auto 0; max-width: 820px; opacity: 0.95; line-height: 1.65; }}
+.market-pill {{ display: inline-flex; align-items: center; justify-content: center; padding: 0.55rem 1rem; border-radius: 999px; background: rgba(14,165,233,0.18); border: 1px solid rgba(56,189,248,0.25); color: {primary_text}; margin: 0.35rem 0.35rem; animation: pulse-pill 4s ease-in-out infinite alternate; min-width: 150px; }}
+.hero-logo {{ margin: 0 auto; width: 110px; height: 110px; border-radius: 50%; border: 1px solid rgba(56,189,248,0.35); display: flex; align-items: center; justify-content: center; color: #ffffff; font-weight: 700; letter-spacing: 0.05em; font-size: 0.95rem; text-transform: uppercase; box-shadow: 0 0 40px rgba(56,189,248,0.18); background: rgba(255,255,255,0.04); position: relative; z-index: 1; }}
+.hero-panel {{ position: relative; overflow: hidden; }}
+.hero-panel .hero-deco {{ position: absolute; width: 140px; height: 140px; border-radius: 999px; top: 20px; left: 26px; background: rgba(59,130,246,0.18); box-shadow: 0 0 60px rgba(59,130,246,0.25); animation: drift 12s linear infinite; z-index: 0; }}
+.hero-panel .hero-deco-two {{ position: absolute; width: 160px; height: 160px; border-radius: 999px; bottom: 30px; right: 40px; background: rgba(168,85,247,0.12); box-shadow: 0 0 70px rgba(168,85,247,0.22); animation: drift 16s linear reverse infinite; z-index: 0; }}
+.hero-panel > * {{ position: relative; z-index: 1; }}
+@keyframes float-shape {{ 0% {{ transform: translateY(0px) rotate(0deg); }} 50% {{ transform: translateY(-24px) rotate(12deg); }} 100% {{ transform: translateY(0px) rotate(0deg); }} }}
+@keyframes glow-text {{ 0% {{ text-shadow: 0 0 12px rgba(56,189,248,0.5); }} 100% {{ text-shadow: 0 0 28px rgba(168,85,247,0.9); }} }}
+@keyframes pulse-pill {{ 0% {{ transform: scale(1); opacity: 1; }} 100% {{ transform: scale(1.04); opacity: 0.9; }} }}
+@keyframes drift {{ 0% {{ transform: translate(0,0); }} 50% {{ transform: translate(12px,-18px); }} 100% {{ transform: translate(0,0); }} }}
+.feature-card {{ background: {card_bg}; border: 1px solid rgba(255,255,255,0.08); border-radius: 24px; padding: 1.6rem; transition: transform .25s ease, box-shadow .25s ease; text-align: left; }}
+.feature-card:hover {{ transform: translateY(-6px); box-shadow: 0 22px 65px rgba(34,211,238,0.14); }}
+.stat-card {{ background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 24px; padding: 1.5rem; min-height: 170px; }}
+.stat-card h3 {{ margin: 0 0 0.75rem; color: {secondary_text}; }}
+.bottom-nav {{ display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem; margin-top: 2rem; }}
+.nav-chip {{ background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; padding: 0.85rem 1.2rem; color: {primary_text}; text-decoration: none; font-size: 0.95rem; }}
+.nav-chip:hover {{ background: rgba(14,165,233,0.12); }}
+@media only screen and (max-width: 900px) {{ .hero-title {{ font-size: 2.4rem; }} .hero-subtitle {{ font-size: 1rem; max-width: 100%; }} }}
+</style>
+""", unsafe_allow_html=True)
+
+    user = auth_manager.get_current_user() or {'username': 'Guest'}
+    active_page = st.session_state.get('page', 'dashboard')
+    public_pages = ['login', 'signup', 'forgot_password', 'reset_password', 'pin_entry', 'pin_reset_request', 'pin_reset']
+
+    if not auth_manager.is_authenticated() and active_page not in public_pages:
+        st.session_state.page = 'login'
+        st.rerun()
+
+    if active_page == 'dashboard':
+        show_dashboard_page(auth_manager.get_current_user())
+    elif active_page == 'analysis':
+        show_analysis_page()
+    elif active_page == 'alerts':
+        show_alerts_page()
+    elif active_page == 'portfolio':
+        show_portfolio_page()
+    elif active_page == 'settings':
+        show_settings_page()
+    elif active_page == 'pin_entry':
+        show_pin_entry_page()
+    elif active_page == 'pin_reset_request':
+        show_pin_reset_request_page()
+    elif active_page == 'pin_reset':
+        show_pin_reset_page()
+    elif active_page == 'admin_train':
+        render_admin_training_dashboard()
+    elif active_page == 'telegram_dashboard':
+        render_telegram_dashboard()
+    else:
+        show_dashboard_page(auth_manager.get_current_user())
+
+
+@auth_manager.admin_required
+def show_admin_dashboard():
+    render_back_button(target_page='dashboard', label='← Back to Dashboard', key='back_admin')
+    st.markdown("## 🛡️ Admin Dashboard")
+
+    if not can_access_admin(auth_manager.get_current_user()):
+        st.error("Access denied.")
+        return
+
+    db = Database()
+    system_health = db.get_system_health()
+    system_perf = db.get_system_performance()
+
+    st.markdown("### System Health Overview")
+    if system_health:
+        health_cols = responsive_ui.get_responsive_columns(5, mobile_count=1)
+        health_cols[0].metric("Active Users", system_health.get('active_users', 0))
+        health_cols[1].metric("Active Alerts", system_health.get('active_alerts', 0))
+        health_cols[2].metric("Activities (24h)", system_health.get('activities_24h', 0))
+        health_cols[3].metric("API Calls (1h)", system_health.get('api_calls_1h', 0))
+        health_cols[4].metric("Avg API/User (24h)", f"{system_health.get('avg_api_per_user', 0) or 0:.2f}")
+    else:
+        st.info("No system health metrics available yet.")
+
+    st.markdown("---")
+    if st.button("Open Admin Tools", key='admin_open_training'):
+        st.session_state.page = 'admin_tools'
+        st.rerun()
+
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "👥 User Management",
+        "📊 Analytics",
+        "📋 Activity Logs",
+        "🔔 Notifications",
+        "⚙️ System Settings",
+        "🔐 Security"
+    ])
+
+    with tab1:
+        show_user_management()
+
+    with tab2:
+        show_analytics()
+
+    with tab3:
+        show_activity_logs()
+
+    with tab4:
+        show_notifications()
+
+    with tab5:
+        show_system_settings()
+
+    with tab6:
+        show_security_settings()
+
+    st.markdown("---")
+    if auth_manager.has_any_role(['Super Admin', 'Admin']):
+        render_telegram_dashboard()
+
+
 def show_admin_tools_page():
     render_back_button(target_page='admin', label='← Back to Admin', key='back_admin_tools')
     st.markdown("## 🧠 Admin Tools")
@@ -2269,13 +2462,13 @@ def show_admin_tools_page():
                 with cols[0]:
                     st.markdown(f"**{user['username']}** — {user['email']}")
                 with cols[1]:
-                    if st.button("Approve", key=f"approve_user_{user['id']}"):
+                    if st.button("Approve", key=f"approve_user_{user['id']}", width='stretch'):
                         db.update_user(user['id'], is_active=1)
                         db.log_activity(auth_manager.get_current_user()['id'], 'approve_user', f"Approved user {user['username']}")
                         st.success(f"Approved {user['username']}")
                         st.rerun()
                 with cols[2]:
-                    if st.button("Deny", key=f"deny_user_{user['id']}"):
+                    if st.button("Deny", key=f"deny_user_{user['id']}", width='stretch'):
                         db.update_user(user['id'], is_active=0, is_banned=1)
                         db.log_activity(auth_manager.get_current_user()['id'], 'deny_user', f"Denied user {user['username']}")
                         st.error(f"Denied {user['username']}")

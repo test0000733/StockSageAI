@@ -239,6 +239,18 @@ class Database:
                 )
             ''')
 
+            default_telegram_config = [
+                ('telegram_enabled', 'true', 'Toggle daily Telegram forecast delivery'),
+                ('telegram_schedule_time', '10:15', 'Daily send time in HH:MM IST'),
+                ('telegram_message_format', 'compact', 'Telegram message format'),
+                ('telegram_top10_mode', 'dynamic', 'Top 10 selection mode')
+            ]
+            for key, value, description in default_telegram_config:
+                cursor.execute('''
+                    INSERT OR IGNORE INTO telegram_config (config_key, config_value, description)
+                    VALUES (?, ?, ?)
+                ''', (key, value, description))
+
             conn.commit()
 
         self._ensure_default_user()
@@ -857,6 +869,40 @@ class Database:
             columns = [desc[0] for desc in cursor.description]
             return [dict(zip(columns, row)) for row in rows]
 
+    def set_telegram_config(self, config_key, config_value, description=None):
+        """Persist a Telegram runtime setting to the database."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT OR REPLACE INTO telegram_config (config_key, config_value, description, updated_at)
+                VALUES (?, ?, COALESCE(?, (SELECT description FROM telegram_config WHERE config_key = ?)), CURRENT_TIMESTAMP)
+            ''', (config_key, str(config_value), description, config_key))
+            conn.commit()
+
+    def get_telegram_config(self, config_key, default=None):
+        """Read a Telegram runtime setting from the database."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT config_value FROM telegram_config WHERE config_key = ?
+            ''', (config_key,))
+            row = cursor.fetchone()
+            if row:
+                return row[0]
+            return default
+
+    def get_all_telegram_config(self):
+        """Return all Telegram runtime settings."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT config_key, config_value, description, updated_at
+                FROM telegram_config
+                ORDER BY config_key
+            ''')
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            return [dict(zip(columns, row)) for row in rows]
 # Email functions
 def send_email(to_email, subject, body):
     # Configure your email settings here

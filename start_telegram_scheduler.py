@@ -7,6 +7,7 @@ Run this to start the daily 10:15 AM IST forecast scheduler
 import os
 import sys
 import logging
+import time
 from datetime import datetime
 import pytz
 
@@ -48,72 +49,77 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+
+def run_scheduler_loop(max_restarts: int = 3, restart_delay_seconds: int = 30):
+    """Run the scheduler in a loop so it keeps surviving unexpected exits."""
+    restart_count = 0
+
+    while True:
+        try:
+            logger.info("="*70)
+            logger.info("🚀 Starting StockSageAI Telegram Forecast Scheduler")
+            logger.info("="*70)
+
+            from StockSageAI.telegram_manager import get_telegram_forecast_manager
+            manager = get_telegram_forecast_manager()
+
+            status = manager.get_system_status()
+            logger.info(f"   Telegram: {status.get('telegram_connection')}")
+            logger.info(f"   Scheduler: {status.get('scheduler_status')}")
+            logger.info(f"   Schedule: {status.get('schedule_time')} IST")
+            logger.info(f"   Trading Day Today: {status.get('trading_day_today')}")
+            if status.get('next_scheduled_run'):
+                logger.info(f"   Next Run: {status['next_scheduled_run']}")
+
+            logger.info("\n🧪 Testing Telegram connection...")
+            test_result = manager.test_telegram()
+            if test_result.get('success'):
+                logger.info(f"   ✅ {test_result['message']}")
+            else:
+                logger.error(f"   ❌ {test_result['message']}")
+                logger.error("   Telegram connection failed; retrying after delay")
+                time.sleep(restart_delay_seconds)
+                restart_count += 1
+                if restart_count >= max_restarts:
+                    raise RuntimeError("Telegram connection failed repeatedly")
+                continue
+
+            logger.info("\n🚀 Starting forecast scheduler loop...")
+            manager.start_scheduler(run_in_background=False)
+            return True
+
+        except KeyboardInterrupt:
+            logger.info("\n⏹️ Scheduler stopped by user")
+            return True
+        except Exception as e:
+            logger.error(f"❌ Scheduler crashed: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+            restart_count += 1
+            if restart_count > max_restarts:
+                logger.error("❌ Max restarts reached; scheduler will stop")
+                return False
+            logger.warning(f"🔁 Restarting scheduler in {restart_delay_seconds} seconds (attempt {restart_count}/{max_restarts})")
+            time.sleep(restart_delay_seconds)
+
+
 def main():
     """Main entry point for Telegram forecast system"""
-    
-    logger.info("="*70)
-    logger.info("🚀 StockSageAI Telegram Forecast System")
-    logger.info("="*70)
-    
     try:
-        # Import manager
-        from StockSageAI.telegram_manager import get_telegram_forecast_manager
-        
-        # Initialize manager
-        logger.info("📥 Initializing Telegram Forecast Manager...")
-        manager = get_telegram_forecast_manager()
-        
-        # Get system status
-        logger.info("📊 Checking system status...")
-        status = manager.get_system_status()
-        
-        logger.info(f"   Telegram: {status.get('telegram_connection')}")
-        logger.info(f"   Scheduler: {status.get('scheduler_status')}")
-        logger.info(f"   Schedule: {status.get('schedule_time')} IST")
-        logger.info(f"   Trading Day Today: {status.get('trading_day_today')}")
-        
-        if status.get('next_scheduled_run'):
-            logger.info(f"   Next Run: {status['next_scheduled_run']}")
-        
-        # Test Telegram connection
-        logger.info("\n🧪 Testing Telegram connection...")
-        test_result = manager.test_telegram()
-        
-        if test_result.get('success'):
-            logger.info(f"   ✅ {test_result['message']}")
-        else:
-            logger.error(f"   ❌ {test_result['message']}")
-            logger.error("   Cannot proceed without Telegram connection")
-            return False
-        
-        # Start scheduler
-        logger.info("\n🚀 Starting forecast scheduler...")
-        manager.start_scheduler(run_in_background=False)
-        
-        # This blocks forever (scheduler loop)
-        logger.info("✅ Scheduler running. Press Ctrl+C to stop.")
-        
-    except KeyboardInterrupt:
-        logger.info("\n⏹️ Scheduler stopped by user")
-        return True
-        
+        return run_scheduler_loop()
     except ImportError as e:
         logger.error(f"❌ Import error: {str(e)}")
         logger.error("   Make sure all dependencies are installed: pip install -r requirements.txt")
         return False
-        
     except ValueError as e:
         logger.error(f"❌ Configuration error: {str(e)}")
         logger.error("   Make sure .env file exists with TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID")
         return False
-        
     except Exception as e:
         logger.error(f"❌ Unexpected error: {str(e)}")
         import traceback
         logger.error(traceback.format_exc())
         return False
-    
-    return True
 
 
 if __name__ == "__main__":
