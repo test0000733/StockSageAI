@@ -9,6 +9,17 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+
+def _safe_metric_value(value, default=0.0):
+    """Return a numeric metric value, converting None-like data to a safe default."""
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def render_telegram_dashboard():
     """
     Render Telegram Forecast section in Admin Dashboard
@@ -236,19 +247,22 @@ def render_telegram_dashboard():
         if performance:
             col1, col2, col3 = st.columns(3)
             with col1:
+                avg_accuracy = _safe_metric_value(performance.get('avg_accuracy', 0))
                 st.metric(
                     "Avg Directional Accuracy",
-                    f"{performance.get('avg_accuracy', 0):.1f}%"
+                    f"{avg_accuracy:.1f}%"
                 )
             with col2:
+                max_accuracy = _safe_metric_value(performance.get('max_accuracy', 0))
                 st.metric(
                     "Max Accuracy",
-                    f"{performance.get('max_accuracy', 0):.1f}%"
+                    f"{max_accuracy:.1f}%"
                 )
             with col3:
+                symbols_evaluated = performance.get('symbols_evaluated', 0) or 0
                 st.metric(
                     "Symbols Evaluated",
-                    performance.get('symbols_evaluated', 0)
+                    symbols_evaluated
                 )
         else:
             st.info("No performance metrics available yet")
