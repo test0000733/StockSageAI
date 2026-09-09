@@ -15,6 +15,51 @@ import hashlib
 logger = logging.getLogger(__name__)
 
 
+def build_health_payload() -> Dict:
+    """Build the health payload including dependency checks."""
+    payload = {
+        'status': 'operational',
+        'timestamp': datetime.now().isoformat(),
+        'version': '1.0.0',
+        'checks': {}
+    }
+
+    # DB connectivity check (lightweight)
+    try:
+        from StockSageAI.database import Database
+        db = Database()
+        import sqlite3
+        with sqlite3.connect(db.db_path, timeout=5) as conn:
+            cur = conn.cursor()
+            cur.execute('SELECT 1')
+            cur.fetchone()
+        payload['checks']['database'] = {'ok': True, 'detail': db.db_path}
+    except Exception as e:
+        payload['checks']['database'] = {'ok': False, 'detail': str(e)}
+
+    # Telegram service check (if available)
+    try:
+        from StockSageAI.telegram_service import get_telegram_service
+        svc = get_telegram_service()
+        is_connected, msg = (False, 'not available')
+        if getattr(svc, 'is_configured', False):
+            try:
+                is_connected, msg = svc.test_connection()
+            except Exception as e:
+                is_connected, msg = False, str(e)
+        else:
+            msg = getattr(svc, 'config_error', 'not configured')
+
+        payload['checks']['telegram'] = {'ok': bool(is_connected), 'detail': msg}
+    except Exception as e:
+        payload['checks']['telegram'] = {'ok': False, 'detail': str(e)}
+
+    if any(not v.get('ok', False) for v in payload['checks'].values()):
+        payload['status'] = 'degraded'
+
+    return payload
+
+
 class APIGateway:
     """REST API for external integrations"""
     
@@ -30,11 +75,51 @@ class APIGateway:
         
         @self.app.route('/api/v1/health', methods=['GET'])
         def health_check():
-            return jsonify({
+            # Base health payload
+            payload = {
                 'status': 'operational',
                 'timestamp': datetime.now().isoformat(),
-                'version': '1.0.0'
-            })
+                'version': '1.0.0',
+                'checks': {}
+            }
+
+            # DB connectivity check (lightweight)
+            try:
+                from StockSageAI.database import Database
+                db = Database()
+                # perform a trivial query
+                import sqlite3
+                with sqlite3.connect(db.db_path, timeout=5) as conn:
+                    cur = conn.cursor()
+                    cur.execute('SELECT 1')
+                    cur.fetchone()
+                payload['checks']['database'] = {'ok': True, 'detail': db.db_path}
+            except Exception as e:
+                payload['checks']['database'] = {'ok': False, 'detail': str(e)}
+
+            # Telegram service check (if available)
+            try:
+                from StockSageAI.telegram_service import get_telegram_service
+                svc = get_telegram_service()
+                is_connected, msg = (False, 'not available')
+                if getattr(svc, 'is_configured', False):
+                    try:
+                        is_connected, msg = svc.test_connection()
+                    except Exception as e:
+                        is_connected, msg = False, str(e)
+                else:
+                    msg = getattr(svc, 'config_error', 'not configured')
+
+                payload['checks']['telegram'] = {'ok': bool(is_connected), 'detail': msg}
+            except Exception as e:
+                # Telegram service not installed or failed to import
+                payload['checks']['telegram'] = {'ok': False, 'detail': str(e)}
+
+            # Overall status downgrade if any critical check failed
+            if any(not v.get('ok', False) for v in payload['checks'].values()):
+                payload['status'] = 'degraded'
+
+            return jsonify(payload)
         
         @self.app.route('/api/v1/predict', methods=['POST'])
         @self.require_auth
@@ -362,3 +447,13 @@ def create_api_app() -> Flask:
     app = Flask(__name__)
     gateway = get_api_gateway(app)
     return gateway.get_app()
+
+
+# Create a module-level app instance for hosting platforms (Render).
+# This exposes a top-level `/health` route in addition to `/api/v1/health`.
+app = create_api_app()
+
+
+@app.route('/health', methods=['GET'])
+def health_root():
+    return jsonify(build_health_payload())
