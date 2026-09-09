@@ -54,7 +54,11 @@ class TelegramAPI:
         if not self.telegram_service:
             response["message"] = "Telegram service not available"
             return response
-        
+
+        if not getattr(self.telegram_service, 'is_configured', False):
+            response["message"] = getattr(self.telegram_service, 'config_error', 'Telegram not configured')
+            return response
+
         is_connected, status_msg = self.telegram_service.test_connection()
         
         response["success"] = is_connected
@@ -141,8 +145,8 @@ class TelegramAPI:
             response["error"] = "No forecasts provided"
             return response
         
-        if not self.telegram_service or not self.notifier:
-            response["error"] = "Telegram not configured"
+        if not self.telegram_service or not getattr(self.telegram_service, 'is_configured', False):
+            response["error"] = getattr(self.telegram_service, 'config_error', 'Telegram not configured')
             return response
         
         try:
@@ -152,28 +156,28 @@ class TelegramAPI:
                     response["stocks_sent"] += 1
                 else:
                     response["stocks_failed"] += 1
-            
+
             # Format message
             logger.info(f"📨 Formatting forecast message ({response['stocks_sent']} stocks)...")
             message = self.notifier.format_daily_forecast(forecasts)
-            
+
             # Send message
             logger.info("📤 Sending forecast to Telegram...")
             success, msg_ids = self.telegram_service.send_long_message(message)
-            
+
             response["success"] = success
             if isinstance(msg_ids, list):
                 response["message_ids"] = [str(m) for m in msg_ids if m]
             elif msg_ids:
                 response["message_ids"] = [str(msg_ids)]
-            
+
             if not success:
                 response["error"] = "Failed to send to Telegram"
-            
+
         except Exception as e:
             response["error"] = str(e)
             logger.error(f"❌ Send forecast error: {str(e)}")
-        
+
         return response
     
     def preview_forecast(self, forecasts: Dict) -> Dict:

@@ -9,31 +9,73 @@ import requests
 import json
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 import time
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Load environment variables
-load_dotenv()
+
+def _load_dotenv_files() -> None:
+    """Load .env from the project root and common runtime locations."""
+    search_roots = []
+    for base in [
+        Path.cwd(),
+        Path(__file__).resolve().parent,
+        Path(__file__).resolve().parent.parent,
+    ]:
+        if base not in search_roots:
+            search_roots.append(base)
+
+    for root in search_roots:
+        env_path = root / '.env'
+        if env_path.exists():
+            load_dotenv(env_path, override=False)
+
+    project_dotenv = find_dotenv(usecwd=True)
+    if project_dotenv:
+        load_dotenv(project_dotenv, override=False)
+
+
+_load_dotenv_files()
+
 
 class TelegramService:
     """Secure Telegram API wrapper for forecast notifications"""
     
     def __init__(self):
         """Initialize Telegram service with credentials from environment"""
-        self.bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
-        self.chat_id = os.getenv('TELEGRAM_CHAT_ID')
-        self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
+        self.bot_token = self._resolve_value('TELEGRAM_BOT_TOKEN')
+        self.chat_id = self._resolve_value('TELEGRAM_CHAT_ID')
+        self.is_configured = bool(self.bot_token and self.chat_id)
+        self.config_error = None
+        if not self.is_configured:
+            self.config_error = "TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set in environment or .env"
+            logger.warning(f"⚠️ Telegram credentials not configured: {self.config_error}")
+        self.base_url = f"https://api.telegram.org/bot{self.bot_token}" if self.bot_token else None
         self.max_retries = 3
-        self.retry_delay = 2  # seconds
-        
-        # Validate credentials
-        if not self.bot_token or not self.chat_id:
-            logger.error("❌ Telegram credentials not configured in .env file")
-            raise ValueError("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set in .env")
-        
+        self.retry_delay = 2
         logger.info("✅ Telegram Service initialized")
+
+    def _resolve_value(self, key: str) -> Optional[str]:
+        value = os.getenv(key)
+        if value and str(value).strip():
+            return str(value).strip()
+
+        # Fallback to common project-root .env values if the runtime didn't load them.
+        for candidate in [
+            Path.cwd(),
+            Path(__file__).resolve().parent,
+            Path(__file__).resolve().parent.parent,
+        ]:
+            env_file = candidate / '.env'
+            if env_file.exists():
+                from dotenv import dotenv_values
+                loaded = dotenv_values(env_file)
+                if loaded.get(key):
+                    os.environ[key] = str(loaded.get(key)).strip()
+                    return str(loaded.get(key)).strip()
+        return None
     
     def send_message(self, text: str, parse_mode: str = "HTML") -> Tuple[bool, Optional[str]]:
         """
@@ -46,10 +88,14 @@ class TelegramService:
         Returns:
             Tuple of (success: bool, message_id: Optional[str])
         """
+        if not self.is_configured:
+            logger.error(f"❌ Cannot send Telegram message: {self.config_error}")
+            return False, None
+
         if not text or len(text.strip()) == 0:
             logger.error("❌ Cannot send empty message")
             return False, None
-        
+
         payload = {
             "chat_id": self.chat_id,
             "text": text,
@@ -122,6 +168,11 @@ class TelegramService:
         Returns:
             Tuple of (is_connected: bool, status_message: str)
         """
+        if not self.is_configured:
+            msg = f"❌ Telegram not configured: {self.config_error}"
+            logger.warning(msg)
+            return False, msg
+
         try:
             response = requests.get(
                 f"{self.base_url}/getMe",
@@ -165,6 +216,10 @@ class TelegramService:
     
     def validate_chat_id(self) -> bool:
         """Check if chat ID is accessible"""
+        if not self.is_configured:
+            logger.warning(f"❌ Cannot validate Telegram chat ID: {self.config_error}")
+            return False
+
         try:
             response = requests.get(
                 f"{self.base_url}/getChat",
@@ -196,6 +251,10 @@ class TelegramService:
         Returns:
             Tuple of (all_sent: bool, message_ids: List[str])
         """
+        if not self.is_configured:
+            logger.error(f"❌ Cannot send long Telegram message: {self.config_error}")
+            return False, []
+
         safe_limit = min(chunk_size, 3900)
         if len(text) <= safe_limit:
             success, message_id = self.send_message(text)
@@ -220,6 +279,10 @@ class TelegramService:
     
     def delete_message(self, message_id: str) -> bool:
         """Delete a previously sent message"""
+        if not self.is_configured:
+            logger.warning(f"❌ Cannot delete Telegram message: {self.config_error}")
+            return False
+
         try:
             response = requests.post(
                 f"{self.base_url}/deleteMessage",
@@ -242,6 +305,10 @@ class TelegramService:
     
     def get_chat_info(self) -> Optional[Dict]:
         """Get information about the chat"""
+        if not self.is_configured:
+            logger.warning(f"❌ Cannot fetch Telegram chat info: {self.config_error}")
+            return None
+
         try:
             response = requests.get(
                 f"{self.base_url}/getChat",
@@ -269,9 +336,5 @@ def get_telegram_service() -> TelegramService:
     """Get or create singleton Telegram service instance"""
     global _telegram_service
     if _telegram_service is None:
-        try:
-            _telegram_service = TelegramService()
-        except ValueError as e:
-            logger.error(f"Failed to initialize Telegram service: {e}")
-            return None
+        _telegram_service = TelegramService()
     return _telegram_service
